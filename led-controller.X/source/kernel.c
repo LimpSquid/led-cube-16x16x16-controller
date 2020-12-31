@@ -59,7 +59,7 @@ void kernel_init(void)
     kernel_init_ttask_call_sequence();
     kernel_init_task_init();
     
-    if(kernel_rtask_size() != 0 && kernel_ttask_size() !=0)
+    if(kernel_rtask_size() != 0 && kernel_ttask_size() != 0)
         kernel_exec_func = kernel_execute_ttask_rtask;
     else if(kernel_rtask_size() != 0)
         kernel_exec_func = kernel_execute_rtask;
@@ -194,56 +194,46 @@ static void kernel_init_task_init(void)
 
 static void kernel_execute_ttask_rtask(void)
 {
-    bool executed = false;
+    struct kernel_ttask_param* param;
     
     elapsed_ticks = KERN_TMR_REG - previous_ticks;
     previous_ticks += elapsed_ticks;
     
     do {
-        struct kernel_ttask_param* param = kernel_ttask_sorted_iterator->param;
+        param = kernel_ttask_sorted_iterator->param;
         if(param->ticks <= elapsed_ticks) {
-            if(executed)
-                param->ticks = 0;
-            else {
-                param->ticks = param->interval;
-                kernel_ttask_sorted_iterator->exec();
-                executed = true;
-            }
+            param->ticks = param->interval;
+            kernel_ttask_sorted_iterator->exec();
         } else
             param->ticks -= elapsed_ticks;
         
         kernel_ttask_sorted_iterator = param->next;
     } while(kernel_ttask_sorted_iterator != kernel_ttask_sorted_begin);
+    kernel_restore_ttask_sorted_iterator();
     
-    if(!executed) {
-        kernel_rtask_iterator->exec();
-        if(++kernel_rtask_iterator == kernel_rtask_end)
-            kernel_restore_rtask_iterator();
-    }
+    kernel_rtask_iterator->exec();
+    if(++kernel_rtask_iterator == kernel_rtask_end)
+        kernel_restore_rtask_iterator();
 }
 
 static void kernel_execute_ttask(void)
 {
-    bool executed = false;
+    struct kernel_ttask_param* param;
     
     elapsed_ticks = KERN_TMR_REG - previous_ticks;
     previous_ticks += elapsed_ticks;
     
     do {
-        struct kernel_ttask_param* param = kernel_ttask_sorted_iterator->param;
+        param = kernel_ttask_sorted_iterator->param;
         if(param->ticks <= elapsed_ticks) {
-            if(executed)
-                param->ticks = 0;
-            else {
-                param->ticks = param->interval;
-                kernel_ttask_sorted_iterator->exec();
-                executed = true;
-            }
+            param->ticks = param->interval;
+            kernel_ttask_sorted_iterator->exec();
         } else
             param->ticks -= elapsed_ticks;
         
         kernel_ttask_sorted_iterator = param->next;
     } while(kernel_ttask_sorted_iterator != kernel_ttask_sorted_begin);
+    kernel_restore_ttask_sorted_iterator();
 }
 
 static void kernel_execute_rtask(void)

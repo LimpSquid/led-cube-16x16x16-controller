@@ -3,7 +3,6 @@
 #include "../include/assert.h"
 #include "../include/sys.h"
 #include <xc.h>
-#include <string.h>
 
 #define UART_SET_REG(reg, mask) (reg |= mask)
 #define UART_CLR_REG(reg, mask) (reg &= ~mask)
@@ -34,7 +33,7 @@
 #define UART_TXBF_MASK          0x0200 
 
 #define uart_rx_ready()         (UART_USTA_REG & UART_RXDA_MASK)
-#define uart_tx_ready()         (uart_tx_consumer != uart_tx_consumer && !(UART_USTA_REG & UART_TXBF_MASK))
+#define uart_tx_ready()         (uart_tx_consumer != uart_tx_producer && !(UART_USTA_REG & UART_TXBF_MASK))
 
 enum uart_work_state
 {
@@ -120,12 +119,13 @@ void uart_error_reset(void)
     
     uart_state = UART_IDLE;
     
+    // Reset buffers
     uart_tx_producer = uart_tx_begin;
     uart_tx_consumer = uart_tx_begin;
-    
     uart_rx_producer = uart_rx_begin;
     uart_rx_consumer = uart_rx_begin;
     
+    // Clear errors and enable module
     UART_CLR_REG(UART_USTA_REG, UART_ERROR_MASK);
     UART_SET_REG(UART_UMODE_REG, UART_ENABLE_MASK);
 }
@@ -205,8 +205,7 @@ static unsigned char uart_tx_take(void)
 
 static void uart_error_callback(struct uart_error_status error)
 {
-    // @Todo: dummy for now
-    (void)(error);
+    (void)(error); // Dummy
 }
 
 static void uart_error_notify()

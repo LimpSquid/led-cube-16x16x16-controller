@@ -39,4 +39,3 @@ unsigned char uart_read(void);
 int uart_read_buffer(unsigned char* buffer, unsigned int max_size);
 
 #endif	/* UART_H */
-

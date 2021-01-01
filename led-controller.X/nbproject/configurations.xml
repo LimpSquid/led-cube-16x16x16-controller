@@ -14,6 +14,7 @@
       <itemPath>include/uart.h</itemPath>
       <itemPath>include/spi1.h</itemPath>
       <itemPath>include/dma.h</itemPath>
+      <itemPath>include/register.h</itemPath>
     </logicalFolder>
     <logicalFolder name="LinkerScript"
                    displayName="Linker Files"

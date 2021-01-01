@@ -1,7 +1,6 @@
 #include "../include/dma.h"
 #include "../include/assert.h"
 #include "../include/register.h"
-#include <stdint.h>
 #include <xc.h>
 
 #define DMA_SET_REG(reg, mask)      (reg |= mask)

@@ -57,7 +57,8 @@ enum
 /* @Todo: implement */
 enum
 {
-    KERN_INIT_SUCCCES = 0
+    KERN_INIT_SUCCCES = 0,
+    KERN_INIT_FAILED,
 };
 
 enum 

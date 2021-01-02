@@ -11,7 +11,7 @@ int main()
     
     // Initialize other stuff
     dma_init();
-  
+    
     // Wakeup bonzo for the kernel init
     sys_wakeup_bonzo();
     kernel_init();

@@ -33,7 +33,7 @@
 #define uart_rx_ready()         (UART_USTA_REG & UART_URXDA_MASK)
 #define uart_tx_ready()         (uart_tx_consumer != uart_tx_producer && !(UART_USTA_REG & UART_UTXBF_MASK))
 
-enum uart_work_state
+enum uart_state
 {
     UART_IDLE = 0x00,
     
@@ -75,7 +75,7 @@ static struct uart_error_notifier uart_notifier =
 static const struct uart_error_notifier** uart_notifier_next = &uart_notifier.next;
 
 static enum uart_status uart_status = UART_STATUS_IDLE;
-static enum uart_work_state uart_state = UART_IDLE;
+static enum uart_state uart_state = UART_IDLE;
 
 static unsigned char uart_tx_fifo[UART_TX_FIFO_SIZE];
 static unsigned char* const uart_tx_begin = &uart_tx_fifo[0];

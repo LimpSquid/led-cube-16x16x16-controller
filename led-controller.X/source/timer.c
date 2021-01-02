@@ -20,12 +20,12 @@ struct timer_module
     } opt;
 };
 
-static unsigned long compute_ticks(int time, int unit);
+static unsigned long timer_compute_ticks(int time, int unit);
 
-static int ttask_init(void);
-static void ttask_execute(void);
-static void ttask_configure(struct kernel_ttask_param* const param);
-KERN_TTASK(timer, ttask_init, ttask_execute, ttask_configure, KERN_INIT_EARLY);
+static int timer_ttask_init(void);
+static void timer_ttask_execute(void);
+static void timer_ttask_configure(struct kernel_ttask_param* const param);
+KERN_TTASK(timer, timer_ttask_init, timer_ttask_execute, timer_ttask_configure, KERN_INIT_EARLY);
 
 #ifdef TIMER_POOL_SIZE
     #if (TIMER_POOL_SIZE < 1)
@@ -74,14 +74,14 @@ void timer_set_time(struct timer_module* timer, int time, int unit)
 {
     ASSERT(timer != NULL);
     
-    timer->interval = compute_ticks(time, unit);
+    timer->interval = timer_compute_ticks(time, unit);
     timer->ticks = timer->interval;
 }
 
 void timer_start(struct timer_module* timer, int time, int unit)
 {
     ASSERT(timer != NULL);
-    timer->interval = compute_ticks(time, unit);
+    timer->interval = timer_compute_ticks(time, unit);
     timer->ticks = timer->interval;
     timer->opt.timedout = false;
     timer->opt.suspended = false;
@@ -113,7 +113,7 @@ bool timer_is_valid(const struct timer_module* timer)
     return timer->opt.assigned;
 }
 
-static unsigned long compute_ticks(int time, int unit)
+static unsigned long timer_compute_ticks(int time, int unit)
 {
     unsigned long ticks;
     switch(unit) {
@@ -134,7 +134,7 @@ static unsigned long compute_ticks(int time, int unit)
     return ticks;
 }
 
-static int ttask_init(void)
+static int timer_ttask_init(void)
 {
     for(int i = 0; i < TIMER_POOL_SIZE; ++i)
         timer_pool[i].opt.assigned = false;
@@ -142,7 +142,7 @@ static int ttask_init(void)
     return KERN_INIT_SUCCCES;
 }
 
-static void ttask_execute(void)
+static void timer_ttask_execute(void)
 {
     void (*execute)(struct timer_module*) = NULL;
 
@@ -186,7 +186,7 @@ static void ttask_execute(void)
         (*execute)(timer);
 }
 
-static void ttask_configure(struct kernel_ttask_param* const param)
+static void timer_ttask_configure(struct kernel_ttask_param* const param)
 {
     kernel_ttask_set_priority(param, KERN_TTASK_PRIORITY_HIGH);
     kernel_ttask_set_interval(param, TIMER_TICK_INTERVAL, KERN_TIME_UNIT_US);

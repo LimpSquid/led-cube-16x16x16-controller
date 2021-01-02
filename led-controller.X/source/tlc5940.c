@@ -22,42 +22,42 @@
 #define SPI_SDO_TRIS_MASK               0x00000008
 #define SPI_SCK_TRIS_MASK               0x00000040
 
-enum work_state
+enum tlc5940_state
 {
-    WS_INIT = 0,
-    WS_IDLE,
-    WS_UPDATE,
-    WS_UPDATE_DMA_START,
-    WS_UPDATE_DMA_WAIT,
-    WS_UPDATE_CLEAR_BUFFER,
+    TLC5940_INIT = 0,
+    TLC5940_IDLE,
+    TLC5940_UPDATE,
+    TLC5940_UPDATE_DMA_START,
+    TLC5940_UPDATE_DMA_WAIT,
+    TLC5940_UPDATE_CLEAR_BUFFER,
 };
 
-static int rtask_init(void);
-static void rtask_execute(void);
-KERN_QUICK_RTASK(tlc5940, rtask_init, rtask_execute);
+static int tlc5940_rtask_init(void);
+static void tlc5940_rtask_execute(void);
+KERN_QUICK_RTASK(tlc5940, tlc5940_rtask_init, tlc5940_rtask_execute);
 
-static unsigned char grayscale_buffer[TLC5940_GRAYSCALE_BUFFER_SIZE]; // Must be made available before the DMA config
+static unsigned char tlc5940_grayscale_buffer[TLC5940_GRAYSCALE_BUFFER_SIZE]; // Must be made available before the DMA config
 
-static const struct dma_config dma_config =
+static const struct dma_config tlc5940_dma_config =
 {
     .block_transfer_complete = NULL, // For now we just poll the DMA channel
-    .src_mem = grayscale_buffer,
+    .src_mem = tlc5940_grayscale_buffer,
     .src_size = TLC5940_GRAYSCALE_BUFFER_SIZE,
 };
 
-static const struct spi_config spi_config =
+static const struct spi_config tlc5940_spi_config =
 {
     .spicon_flags = SF_MSTEN | SF_STXISEL_COMPLETE | SF_DISSDI | SF_MODE8 | SF_CKP,
     .baudrate = 4000000LU, // @Todo: increase to 40000000LU
 };
 
-static struct dma_channel* dma_channel = NULL;
-static struct spi_module* spi_module = NULL;
-static enum work_state work_state = WS_INIT;
+static struct dma_channel* tlc5940_dma_channel = NULL;
+static struct spi_module* tlc5940_spi_module = NULL;
+static enum tlc5940_state tlc5940_state = TLC5940_INIT;
 
 bool tlc5940_busy(void)
 {
-    return work_state != WS_IDLE;
+    return tlc5940_state != TLC5940_IDLE;
 }
 
 bool tlc5940_ready(void)
@@ -70,11 +70,11 @@ bool tlc5940_update(void)
     if(tlc5940_busy())
         return false;
     
-    work_state = WS_UPDATE;
+    tlc5940_state = TLC5940_UPDATE;
     return true;
 }
 
-static int rtask_init(void)
+static int tlc5940_rtask_init(void)
 {
     // Initialize IO
     sys_unlock();
@@ -84,51 +84,51 @@ static int rtask_init(void)
     sys_lock();
         
     // Initialize DMA
-    dma_channel = dma_construct(dma_config);
-    if(NULL == dma_channel)
+    tlc5940_dma_channel = dma_construct(tlc5940_dma_config);
+    if(NULL == tlc5940_dma_channel)
         goto deinit_dma;
     
     // Initialize SPI
-    spi_module = spi_construct(SPI_CHANNEL, spi_config);
-    if(NULL == spi_module)
+    tlc5940_spi_module = spi_construct(SPI_CHANNEL, tlc5940_spi_config);
+    if(NULL == tlc5940_spi_module)
         goto deinit_spi;
-    spi_configure_dma_dst(spi_module, dma_channel); // SPI module is the destination of the dma module
-    spi_enable(spi_module);
+    spi_configure_dma_dst(tlc5940_spi_module, tlc5940_dma_channel); // SPI module is the destination of the dma module
+    spi_enable(tlc5940_spi_module);
     
     return KERN_INIT_SUCCCES;
     
 deinit_spi:
-    spi_destruct(spi_module);
+    spi_destruct(tlc5940_spi_module);
 deinit_dma:
-    dma_destruct(dma_channel);
+    dma_destruct(tlc5940_dma_channel);
 
     return KERN_INIT_FAILED;
 }
 
-static void rtask_execute(void)
+static void tlc5940_rtask_execute(void)
 {
-    switch(work_state) {
-        case WS_INIT:
+    switch(tlc5940_state) {
+        case TLC5940_INIT:
             // @Todo: do some init stuff
-            work_state = WS_IDLE;
+            tlc5940_state = TLC5940_IDLE;
             break;
         default:
-        case WS_IDLE:
+        case TLC5940_IDLE:
             break;
-        case WS_UPDATE:
-        case WS_UPDATE_DMA_START:
-            if(dma_ready(dma_channel)) {
-                dma_enable_transfer(dma_channel);
-                work_state = WS_UPDATE_DMA_WAIT;
+        case TLC5940_UPDATE:
+        case TLC5940_UPDATE_DMA_START:
+            if(dma_ready(tlc5940_dma_channel)) {
+                dma_enable_transfer(tlc5940_dma_channel);
+                tlc5940_state = TLC5940_UPDATE_DMA_WAIT;
             }
             break;
-        case WS_UPDATE_DMA_WAIT:
-            if(dma_ready(dma_channel))
-                work_state = WS_UPDATE_CLEAR_BUFFER;
+        case TLC5940_UPDATE_DMA_WAIT:
+            if(dma_ready(tlc5940_dma_channel))
+                tlc5940_state = TLC5940_UPDATE_CLEAR_BUFFER;
             break;
-        case WS_UPDATE_CLEAR_BUFFER:
-            memset(grayscale_buffer, 0x00, TLC5940_GRAYSCALE_BUFFER_SIZE);
-            work_state = WS_IDLE;
+        case TLC5940_UPDATE_CLEAR_BUFFER:
+            memset(tlc5940_grayscale_buffer, 0x00, TLC5940_GRAYSCALE_BUFFER_SIZE);
+            tlc5940_state = TLC5940_IDLE;
             break;
     }
 }

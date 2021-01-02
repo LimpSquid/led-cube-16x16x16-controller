@@ -5,4 +5,3 @@ void kernel_init(void);
 void kernel_execute(void);
 
 #endif	/* KERNEL_H */
-

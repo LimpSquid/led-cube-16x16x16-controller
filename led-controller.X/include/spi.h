@@ -65,4 +65,3 @@ void spi_disable(struct spi_module* module);
 bool spi_transmit(struct spi_module* module, unsigned int* buffer, unsigned char size);
 
 #endif	/* SPI_H */
-

@@ -21,4 +21,3 @@ void sys_unlock(void);
 void sys_cpu_early_init(void);
 
 #endif	/* SYS_H */
-

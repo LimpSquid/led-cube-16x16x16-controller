@@ -32,4 +32,3 @@ void __assert_print_no_block(const char* format, ...);
 #endif
 
 #endif	/* ASSERT_H */
-

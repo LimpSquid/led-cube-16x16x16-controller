@@ -116,4 +116,3 @@ void kernel_ttask_set_priority(struct kernel_ttask_param* const ttask_param, int
 void kernel_ttask_set_interval(struct kernel_ttask_param* const ttask_param, int time, int unit);
 
 #endif	/* KERNEL_TASK_H */
-

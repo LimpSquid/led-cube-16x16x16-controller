@@ -11,4 +11,3 @@
 #define KERN_TMR_CLK_FREQ   SYS_PB_CLOCK    // Hardware timer input frequency (can be calculated with SYS_CLK / PB_DIV)
 
 #endif	/* KERNEL_CONFIG_H */
-

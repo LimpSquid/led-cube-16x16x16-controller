@@ -36,4 +36,3 @@ bool timer_timed_out(const struct timer_module* timer);
 bool timer_is_valid(const struct timer_module* timer);
 
 #endif	/* TIMER_H */
-

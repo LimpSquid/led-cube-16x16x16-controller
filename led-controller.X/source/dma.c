@@ -4,11 +4,11 @@
 #include <xc.h>
 #include <sys/attribs.h>
 
-#define PHY_ADDR(virt)              ((int)virt < 0 ? ((int)virt & 0x1FFFFFFFL) : (unsigned int)((unsigned char*)virt + 0x40000000L))
-
-#define NUMBER_OF_CHANNELS          (sizeof(dma_channels) / sizeof(dma_channels[0]))
+#define DMA_PHY_ADDR(virt)          ((int)virt < 0 ? ((int)virt & 0x1FFFFFFFL) : (unsigned int)((unsigned char*)virt + 0x40000000L))
+#define DMA_NUMBER_OF_CHANNELS      (sizeof(dma_channels) / sizeof(dma_channels[0]))
          
 #define DMACON_REG                  DMACON
+
 #define DMACON_WORD                 0x00008000
 
 #define DCHCON_CHEN_MASK            0x00000080
@@ -60,7 +60,7 @@ struct dma_channel
     bool assigned;
 };
 
-static void handle_interrupt(struct dma_channel* channel);
+static void dma_handle_interrupt(struct dma_channel* channel);
 
 static const struct dma_interrupt_map dma_channel_interrupts[] =
 {
@@ -117,7 +117,7 @@ static struct dma_channel dma_channels[] =
 void dma_init(void)
 {
     // Disable interrupt on each channel
-    for(int i = 0; i < NUMBER_OF_CHANNELS; ++i)
+    for(int i = 0; i < DMA_NUMBER_OF_CHANNELS; ++i)
         atomic_reg_ptr_clr(dma_channels[i].dma_int->iec, dma_channels[i].dma_int->enable_mask);
     
     // Configure DMA
@@ -129,7 +129,7 @@ struct dma_channel* dma_construct(struct dma_config config)
     struct dma_channel* channel = NULL;
     
     // Search for an unused channel
-    for(int i = 0; i < NUMBER_OF_CHANNELS; ++i) {
+    for(int i = 0; i < DMA_NUMBER_OF_CHANNELS; ++i) {
         if(!dma_channels[i].assigned) {
             channel = &dma_channels[i];
             break;
@@ -160,8 +160,8 @@ void dma_configure(struct dma_channel* channel, struct dma_config config)
     atomic_reg_clr(dma_reg->dchcon, DCHCON_CHEN_MASK);
     
     // Configure DMA
-    atomic_reg_value(dma_reg->dchssa) = PHY_ADDR(config.src_mem);
-    atomic_reg_value(dma_reg->dchdsa) = PHY_ADDR(config.dst_mem);
+    atomic_reg_value(dma_reg->dchssa) = DMA_PHY_ADDR(config.src_mem);
+    atomic_reg_value(dma_reg->dchdsa) = DMA_PHY_ADDR(config.dst_mem);
     atomic_reg_value(dma_reg->dchssiz) = config.src_size;
     atomic_reg_value(dma_reg->dchdsiz) = config.dst_size;
     atomic_reg_value(dma_reg->dchcsiz) = config.cell_size;
@@ -189,7 +189,7 @@ void dma_configure_src(struct dma_channel* channel, const void* mem, unsigned sh
     ASSERT(channel != NULL);
     const struct dma_register_map* const dma_reg = channel->dma_reg;
     
-    atomic_reg_value(dma_reg->dchssa) = PHY_ADDR(mem);
+    atomic_reg_value(dma_reg->dchssa) = DMA_PHY_ADDR(mem);
     atomic_reg_value(dma_reg->dchssiz) = size;
 }
 
@@ -198,7 +198,7 @@ void dma_configure_dst(struct dma_channel* channel, const void* mem, unsigned sh
     ASSERT(channel != NULL);
     const struct dma_register_map* const dma_reg = channel->dma_reg;
     
-    atomic_reg_value(dma_reg->dchdsa) = PHY_ADDR(mem);
+    atomic_reg_value(dma_reg->dchdsa) = DMA_PHY_ADDR(mem);
     atomic_reg_value(dma_reg->dchdsiz) = size;
 }
 
@@ -254,7 +254,7 @@ bool dma_ready(struct dma_channel* channel)
     return !dma_busy(channel);
 }
 
-static void handle_interrupt(struct dma_channel* channel)
+static void dma_handle_interrupt(struct dma_channel* channel)
 {
     unsigned int int_flags = atomic_reg_value(channel->dma_reg->dchint);
     
@@ -267,23 +267,23 @@ static void handle_interrupt(struct dma_channel* channel)
 void __ISR(_DMA_0_VECTOR, IPL7AUTO)DMA0interrupt(void)
 {
     static struct dma_channel *channel = &dma_channels[0];
-    handle_interrupt(channel);
+    dma_handle_interrupt(channel);
 }
 
 void __ISR(_DMA_1_VECTOR, IPL7AUTO)DMA1interrupt(void)
 {
     static struct dma_channel *channel = &dma_channels[1];
-    handle_interrupt(channel);
+    dma_handle_interrupt(channel);
 }
 
 void __ISR(_DMA_2_VECTOR, IPL7AUTO)DMA2interrupt(void)
 {
     static struct dma_channel *channel = &dma_channels[2];
-    handle_interrupt(channel);
+    dma_handle_interrupt(channel);
 }
 
 void __ISR(_DMA_3_VECTOR, IPL7AUTO)DMA3interrupt(void)
 {
     static struct dma_channel *channel = &dma_channels[3];
-    handle_interrupt(channel);
+    dma_handle_interrupt(channel);
 }

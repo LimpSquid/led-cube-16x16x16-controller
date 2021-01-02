@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-enum uart_work_status
+enum uart_status
 {
     UART_STATUS_IDLE = 0,
     UART_STATUS_TRANSFERRING,
@@ -25,15 +25,12 @@ struct uart_error_notifier
     const struct uart_error_notifier* next;
 };
 
-enum uart_work_status uart_work_status(void);
-
+enum uart_status uart_current_status(void);
 struct uart_error_status uart_error_status(void);
 void uart_error_register_notifier(void (*callback)(struct uart_error_status), struct uart_error_notifier* const notifier);
 void uart_error_reset(void);
-
 void uart_transmit(unsigned char data);
 void uart_transmit_buffer(unsigned char* buffer, unsigned int size);
-
 bool uart_read_available(void);
 unsigned char uart_read(void);
 int uart_read_buffer(unsigned char* buffer, unsigned int max_size);

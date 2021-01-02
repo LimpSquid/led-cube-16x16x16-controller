@@ -15,25 +15,23 @@
 #define UART_TX_BURST           (UART_TX_FIFO_SIZE >> 2)
 #define UART_RX_BURST           (UART_RX_FIFO_SIZE >> 2)
 
-#define UART_INTERRUPT_REG      IEC1
 #define UART_UMODE_REG          U1MODE
 #define UART_USTA_REG           U1STA
 #define UART_BRG_REG            U1BRG
 #define UART_TX_REG             U1TXREG
 #define UART_RX_REG             U1RXREG
 
-#define UART_UMODE_WORD         0x0000
-#define UART_USTA_WORD          0x5400
+#define UART_UMODE_WORD         0x00000000
+#define UART_USTA_WORD          0x00005400
 #define UART_BRG_WORD           (((SYS_PB_CLOCK / UART_BAUDRATE) >> 4) - 1)
 
-#define UART_INTERRUPT_MASK     0x01c0
-#define UART_ENABLE_MASK        0x8000
-#define UART_ERROR_MASK         0x000e
-#define UART_RXDA_MASK          0x0001
-#define UART_TXBF_MASK          0x0200 
+#define UART_ON_MASK            0x00008000
+#define UART_ERROR_BITS_MASK    0x0000000e
+#define UART_URXDA_MASK         0x00000001
+#define UART_UTXBF_MASK         0x00000200 
 
-#define uart_rx_ready()         (UART_USTA_REG & UART_RXDA_MASK)
-#define uart_tx_ready()         (uart_tx_consumer != uart_tx_producer && !(UART_USTA_REG & UART_TXBF_MASK))
+#define uart_rx_ready()         (UART_USTA_REG & UART_URXDA_MASK)
+#define uart_tx_ready()         (uart_tx_consumer != uart_tx_producer && !(UART_USTA_REG & UART_UTXBF_MASK))
 
 enum uart_work_state
 {
@@ -76,7 +74,7 @@ static struct uart_error_notifier uart_notifier =
 };
 static const struct uart_error_notifier** uart_notifier_next = &uart_notifier.next;
 
-static enum uart_work_status uart_status = UART_STATUS_IDLE;
+static enum uart_status uart_status = UART_STATUS_IDLE;
 static enum uart_work_state uart_state = UART_IDLE;
 
 static unsigned char uart_tx_fifo[UART_TX_FIFO_SIZE];
@@ -91,7 +89,7 @@ static unsigned char* const uart_rx_end = &uart_rx_fifo[UART_RX_FIFO_SIZE - 1];
 static unsigned char* uart_rx_consumer = &uart_rx_fifo[0];
 static unsigned char* uart_rx_producer = &uart_rx_fifo[0];
 
-enum uart_work_status uart_work_status(void)
+enum uart_status uart_current_status(void)
 {
     return uart_status;
 }
@@ -126,8 +124,8 @@ void uart_error_reset(void)
     uart_rx_consumer = uart_rx_begin;
     
     // Clear errors and enable module
-    UART_CLR_REG(UART_USTA_REG, UART_ERROR_MASK);
-    UART_SET_REG(UART_UMODE_REG, UART_ENABLE_MASK);
+    UART_CLR_REG(UART_USTA_REG, UART_ERROR_BITS_MASK);
+    UART_SET_REG(UART_UMODE_REG, UART_ON_MASK);
 }
 
 void uart_transmit(unsigned char data)
@@ -219,10 +217,6 @@ static void uart_error_notify()
 
 static int uart_rtask_init(void)
 {
-    // Disable UART interrupt and module
-    UART_CLR_REG(UART_UMODE_REG, UART_ENABLE_MASK);
-    UART_CLR_REG(UART_INTERRUPT_REG, UART_INTERRUPT_MASK);
-   
     // Set the baudrate generator
     UART_BRG_REG = UART_BRG_WORD;
     
@@ -231,7 +225,7 @@ static int uart_rtask_init(void)
     UART_UMODE_REG = UART_UMODE_WORD;
     
     // Enable UART module
-    UART_SET_REG(UART_UMODE_REG, UART_ENABLE_MASK);
+    UART_SET_REG(UART_UMODE_REG, UART_ON_MASK);
     
     return KERN_INIT_SUCCCES;
 }
@@ -254,7 +248,7 @@ static void uart_rtask_execute(void)
         // Receive routine
         case UART_RECEIVE:
         case UART_RECEIVE_STATUS:
-            uart_error.by_byte |= (UART_USTA_REG & UART_ERROR_MASK) >> 1;
+            uart_error.by_byte |= (UART_USTA_REG & UART_ERROR_BITS_MASK) >> 1;
             uart_state = uart_error.by_byte ? UART_RECEIVE_ERROR : UART_RECEIVE_BURST_READ;
             break;
         case UART_RECEIVE_BURST_READ:
@@ -277,7 +271,7 @@ static void uart_rtask_execute(void)
         
         // Error routine
         case UART_ERROR:
-            UART_CLR_REG(UART_UMODE_REG, UART_ENABLE_MASK);
+            UART_CLR_REG(UART_UMODE_REG, UART_ON_MASK);
             uart_status = UART_STATUS_ERROR;
             uart_state = UART_ERROR_NOTIFY;
             break;

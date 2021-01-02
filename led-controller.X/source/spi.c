@@ -5,15 +5,14 @@
 #include "../include/dma.h"
 #include <xc.h>
 #include <stddef.h>
-#include <proc/ppic32mx.h>
 
-#define BRG(baudrate)           ((SYS_PB_CLOCK / (baudrate << 1)) - 1)
-#define FIFO_DEPTH_MODE32       4
-#define FIFO_DEPTH_MODE16       8
-#define FIFO_DEPTH_MODE8        16
-#define FIFO_SIZE_MODE32        4
-#define FIFO_SIZE_MODE16        2
-#define FIFO_SIZE_MODE8         1
+#define SPI_BRG(baudrate)       ((SYS_PB_CLOCK / (baudrate << 1)) - 1)
+#define SPI_FIFO_DEPTH_MODE32   4
+#define SPI_FIFO_DEPTH_MODE16   8
+#define SPI_FIFO_DEPTH_MODE8    16
+#define SPI_FIFO_SIZE_MODE32    4 // In bytes
+#define SPI_FIFO_SIZE_MODE16    2 // In bytes
+#define SPI_FIFO_SIZE_MODE8     1 // In bytes
 
 #define SPICON_RESET_WORD       0x00000000
 
@@ -90,15 +89,15 @@ struct spi_module spi_modules[] =
     [SC_CHANNEL1] = {
         .spi_reg = (const struct spi_register_map* const)(&SPI1CON),
         .spi_int = &spi_module_interrupts[SC_CHANNEL1],
-        .fifo_depth = FIFO_DEPTH_MODE8,
-        .fifo_size = FIFO_SIZE_MODE8,
+        .fifo_depth = SPI_FIFO_DEPTH_MODE8,
+        .fifo_size = SPI_FIFO_SIZE_MODE8,
         .assigned = false,
     }, 
     [SC_CHANNEL2] = {
         .spi_reg = (const struct spi_register_map* const)(&SPI2CON),
         .spi_int = &spi_module_interrupts[SC_CHANNEL2],
-        .fifo_depth = FIFO_DEPTH_MODE8,
-        .fifo_size = FIFO_SIZE_MODE8,
+        .fifo_depth = SPI_FIFO_DEPTH_MODE8,
+        .fifo_size = SPI_FIFO_SIZE_MODE8,
         .assigned = false,
     }
 };
@@ -142,17 +141,17 @@ void spi_configure(struct spi_module* module, struct spi_config config)
     atomic_reg_ptr_clr(spi_int->ifs, spi_int->transfer_flag_mask);
     
     // Configure SPI
-    atomic_reg_value(spi_reg->spibrg) = BRG(config.baudrate);
+    atomic_reg_value(spi_reg->spibrg) = SPI_BRG(config.baudrate);
     atomic_reg_value(spi_reg->spicon) = config.spicon_flags;
-    module->fifo_depth = FIFO_DEPTH_MODE8;
-    module->fifo_size = FIFO_SIZE_MODE8;
+    module->fifo_depth = SPI_FIFO_DEPTH_MODE8;
+    module->fifo_size = SPI_FIFO_SIZE_MODE8;
     
     if(config.spicon_flags & SF_MODE32) {
-        module->fifo_depth = FIFO_DEPTH_MODE32;
-        module->fifo_size = FIFO_SIZE_MODE32;
+        module->fifo_depth = SPI_FIFO_DEPTH_MODE32;
+        module->fifo_size = SPI_FIFO_SIZE_MODE32;
     } else if(config.spicon_flags & SF_MODE16) {
-        module->fifo_depth = FIFO_DEPTH_MODE16;
-        module->fifo_size = FIFO_SIZE_MODE16;
+        module->fifo_depth = SPI_FIFO_DEPTH_MODE16;
+        module->fifo_size = SPI_FIFO_SIZE_MODE16;
     }
 }
 

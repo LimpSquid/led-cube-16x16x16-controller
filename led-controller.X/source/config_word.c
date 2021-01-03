@@ -7,8 +7,8 @@
 #pragma config IOL1WAY = OFF            // Peripheral Pin Select Configuration (Allow multiple reconfigurations)
 
 // DEVCFG2
-#pragma config FPLLIDIV = DIV_1         // PLL Input Divider (1x Divider)
-#pragma config FPLLMUL = MUL_15         // PLL Multiplier (15x Multiplier)
+#pragma config FPLLIDIV = DIV_2         // PLL Input Divider (1x Divider)
+#pragma config FPLLMUL = MUL_20         // PLL Multiplier (15x Multiplier)
 #pragma config FPLLODIV = DIV_1         // System PLL Output Clock Divider (PLL Divide by 1)
 
 // DEVCFG1

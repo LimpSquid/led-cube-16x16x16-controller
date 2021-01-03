@@ -18,6 +18,8 @@
 
 void sys_lock(void);
 void sys_unlock(void);
+void sys_enable_global_interrupt(void);
+void sys_disable_global_interrupt(void);
 void sys_cpu_early_init(void);
 
 #endif	/* SYS_H */

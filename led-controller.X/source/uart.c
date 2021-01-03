@@ -4,8 +4,8 @@
 #include "../include/sys.h"
 #include <xc.h>
 
-#define UART_SET_REG(reg, mask) (reg |= mask)
-#define UART_CLR_REG(reg, mask) (reg &= ~mask)
+#define UART_REG_SET(reg, mask) (reg |= mask)
+#define UART_REG_CLR(reg, mask) (reg &= ~mask)
 
 #define UART_BAUDRATE           115200LU
 #define UART_TX_FIFO_SIZE       100
@@ -124,8 +124,8 @@ void uart_error_reset(void)
     uart_rx_consumer = uart_rx_begin;
     
     // Clear errors and enable module
-    UART_CLR_REG(UART_USTA_REG, UART_ERROR_BITS_MASK);
-    UART_SET_REG(UART_UMODE_REG, UART_ON_MASK);
+    UART_REG_CLR(UART_USTA_REG, UART_ERROR_BITS_MASK);
+    UART_REG_SET(UART_UMODE_REG, UART_ON_MASK);
 }
 
 void uart_transmit(unsigned char data)
@@ -187,7 +187,7 @@ static void uart_receive(unsigned char data)
 
 static void uart_write(unsigned char data)
 {
-    ASSERT(!!!(UART_USTA_REG & UART_TXBF_MASK));
+    ASSERT(!!!(UART_USTA_REG & UART_UTXBF_MASK));
     UART_TX_REG = data;
 }
 
@@ -225,7 +225,7 @@ static int uart_rtask_init(void)
     UART_UMODE_REG = UART_UMODE_WORD;
     
     // Enable UART module
-    UART_SET_REG(UART_UMODE_REG, UART_ON_MASK);
+    UART_REG_SET(UART_UMODE_REG, UART_ON_MASK);
     
     return KERN_INIT_SUCCCES;
 }
@@ -271,7 +271,7 @@ static void uart_rtask_execute(void)
         
         // Error routine
         case UART_ERROR:
-            UART_CLR_REG(UART_UMODE_REG, UART_ON_MASK);
+            UART_REG_CLR(UART_UMODE_REG, UART_ON_MASK);
             uart_status = UART_STATUS_ERROR;
             uart_state = UART_ERROR_NOTIFY;
             break;

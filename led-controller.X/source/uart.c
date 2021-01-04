@@ -2,6 +2,7 @@
 #include "../include/kernel_task.h"
 #include "../include/assert.h"
 #include "../include/sys.h"
+#include "../include/toolbox.h"
 #include <xc.h>
 
 #define UART_REG_SET(reg, mask) (reg |= mask)
@@ -21,21 +22,21 @@
 #define UART_TX_REG             U1TXREG
 #define UART_RX_REG             U1RXREG
 
-#define UART_UMODE_WORD         0x00000000
-#define UART_USTA_WORD          0x00005400
-#define UART_BRG_WORD           (((SYS_PB_CLOCK / UART_BAUDRATE) >> 4) - 1)
+#define UART_UMODE_WORD         0x0
+#define UART_USTA_WORD          BIT(10) | BIT(12) | MASK(0x1, 14)
+#define UART_BRG_WORD           ((SYS_PB_CLOCK / UART_BAUDRATE) >> 4 - 1)
 
-#define UART_ON_MASK            0x00008000
-#define UART_ERROR_BITS_MASK    0x0000000e
-#define UART_URXDA_MASK         0x00000001
-#define UART_UTXBF_MASK         0x00000200 
+#define UART_ON_MASK            BIT(15)
+#define UART_ERROR_BITS_MASK    MASK(0x7, 1)
+#define UART_URXDA_MASK         BIT(0)
+#define UART_UTXBF_MASK         BIT(9) 
 
 #define uart_rx_ready()         (UART_USTA_REG & UART_URXDA_MASK)
 #define uart_tx_ready()         (uart_tx_consumer != uart_tx_producer && !(UART_USTA_REG & UART_UTXBF_MASK))
 
 enum uart_state
 {
-    UART_IDLE = 0x00,
+    UART_IDLE = 0,
     
     UART_RECEIVE,
     UART_RECEIVE_STATUS,

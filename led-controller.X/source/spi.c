@@ -6,7 +6,7 @@
 #include <xc.h>
 #include <stddef.h>
 
-#define SPI_BRG(baudrate)           ((SYS_PB_CLOCK / (baudrate << 1)) - 1)
+#define SPI_BRG(baudrate)           (SYS_PB_CLOCK / (baudrate << 1) - 1)
 #define SPI_FIFO_DEPTH_MODE32       4
 #define SPI_FIFO_DEPTH_MODE16       8
 #define SPI_FIFO_DEPTH_MODE8        16
@@ -14,9 +14,9 @@
 #define SPI_FIFO_SIZE_MODE16        2 // In bytes
 #define SPI_FIFO_SIZE_MODE8         1 // In bytes
 
-#define SPI_SPICON_RESET_WORD       0x00000000
+#define SPI_SPICON_RESET_WORD       0x0
 
-#define SPI_SPISTAT_SPITBF_MASK     0x00000002
+#define SPI_SPISTAT_SPITBF_MASK     BIT(1)
 
 struct spi_register_map
 {
@@ -45,9 +45,9 @@ static const struct spi_interrupt_map spi_module_interrupts[] =
     [SPI_CHANNEL1] = { 
         .ifs = atomic_reg_ptr_cast(&IFS1),
         .iec = atomic_reg_ptr_cast(&IEC1),
-        .fault_mask = 0x00000008,
-        .receive_mask = 0x00000010,
-        .transfer_mask = 0x00000020,
+        .fault_mask = BIT(3),
+        .receive_mask = BIT(4),
+        .transfer_mask = BIT(5),
         .fault_irq = _SPI1_ERR_IRQ,
         .receive_irq = _SPI1_RX_IRQ,
         .transfer_irq = _SPI1_TX_IRQ,
@@ -55,9 +55,9 @@ static const struct spi_interrupt_map spi_module_interrupts[] =
     [SPI_CHANNEL2] = { 
         .ifs = atomic_reg_ptr_cast(&IFS2),
         .iec = atomic_reg_ptr_cast(&IEC2), 
-        .fault_mask = 0x00200000,
-        .receive_mask = 0x00400000,
-        .transfer_mask = 0x00800000,
+        .fault_mask = BIT(21),
+        .receive_mask = BIT(22),
+        .transfer_mask = BIT(23),
         .fault_irq = _SPI2_ERR_IRQ,
         .receive_irq = _SPI2_RX_IRQ,
         .transfer_irq = _SPI2_TX_IRQ,
@@ -151,13 +151,13 @@ void spi_configure_dma_src(struct spi_module* module, struct dma_channel* channe
     ASSERT(module != NULL);
     ASSERT(channel != NULL);
     unsigned int spicon = atomic_reg_value(module->spi_reg->spicon);
-    struct dma_irq start_event =
+    struct dma_event start_event =
     {
         .enable = true,
         .irq_vector = module->spi_int->receive_irq,
     };
     
-    struct dma_irq abort_event =
+    struct dma_event abort_event =
     {
         .enable = true,
         .irq_vector = module->spi_int->fault_irq,
@@ -174,13 +174,13 @@ void spi_configure_dma_dst(struct spi_module* module, struct dma_channel* channe
     ASSERT(module != NULL);
     ASSERT(channel != NULL);
     unsigned int spicon = atomic_reg_value(module->spi_reg->spicon);
-    struct dma_irq start_event =
+    struct dma_event start_event =
     {
         .enable = true,
         .irq_vector = module->spi_int->transfer_irq,
     };
     
-    struct dma_irq abort_event =
+    struct dma_event abort_event =
     {
         .enable = true,
         .irq_vector = module->spi_int->fault_irq,

@@ -5,7 +5,7 @@
 #include <xc.h>
 
 #if defined(_SYS_CLK) && defined(_PB_DIV)
-    #define SYS_PB_CLOCK                (_SYS_CLK / _PB_DIV)
+    #define SYS_PB_CLOCK            ((unsigned long long)(_SYS_CLK / _PB_DIV))
 #else
     #error "System peripheral bus clock could not be calculated, please define the _SYS_CLK and _PB_DIV." 
 #endif

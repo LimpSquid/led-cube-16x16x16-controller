@@ -1,27 +1,27 @@
 #include "../include/dma.h"
 #include "../include/assert.h"
 #include "../include/register.h"
+#include "../include/toolbox.h"
 #include <xc.h>
 #include <sys/attribs.h>
 
 #define DMA_PHY_ADDR(virt)              ((int)virt < 0 ? ((int)virt & 0x1FFFFFFFL) : (unsigned int)((unsigned char*)virt + 0x40000000L))
 #define DMA_NUMBER_OF_CHANNELS          (sizeof(dma_channels) / sizeof(dma_channels[0]))
+#define DMA_INTERRUPT_PRIORITY          0x3
          
 #define DMA_DMACON_REG                  DMACON
 
-#define DMA_DMACON_WORD                 0x00008000
+#define DMA_DMACON_WORD                 BIT(15)
 
-#define DMA_DCHCON_CHEN_MASK            0x00000080
-#define DMA_DCHCON_CHBUSY_MASK          0x00008000
-#define DMA_DCHECON_CHAIRQ_MASK         0x00ff0000
-#define DMA_DCHECON_CHSIRQ_MASK         0x0000ff00
-#define DMA_DCHECON_AIRQEN_MASK         0x00000008
-#define DMA_DCHECON_SIRQEN_MASK         0x00000010
-#define DMA_DCHINT_CHBCIE_MASK          0x00080000
-#define DMA_DCHINT_CHBCIF_MASK          0x00000008
-#define DMA_DCHINT_ENABLE_BITS_MASK     0xffff0000
-#define DMA_DCHINT_FLAG_BITS_MASK       0x0000ffff
-#define DMA_DCHINT_FLAG_BITS_MASK       0x0000ffff
+#define DMA_DCHCON_CHEN_MASK            BIT(7)
+#define DMA_DCHCON_CHBUSY_MASK          BIT(15)
+#define DMA_DCHECON_CHAIRQ_MASK         MASK(0xff, 16)
+#define DMA_DCHECON_CHSIRQ_MASK         MASK(0xff, 8)
+#define DMA_DCHECON_AIRQEN_MASK         BIT(3)
+#define DMA_DCHECON_SIRQEN_MASK         BIT(4)
+#define DMA_DCHINT_CHBCIE_MASK          BIT(19)
+#define DMA_DCHINT_CHBCIF_MASK          BIT(3)
+#define DMA_DCHINT_ENABLE_BITS_MASK     MASK(0xffff, 8)
 
 #define DMA_DCHECON_CHAIRQ_SHIFT        16
 #define DMA_DCHECON_CHSIRQ_SHIFT        8
@@ -46,8 +46,11 @@ struct dma_interrupt_map
 {
     atomic_reg_ptr(ifs);
     atomic_reg_ptr(iec);
+    atomic_reg_ptr(ipc);
     
     unsigned int mask;
+    unsigned int priority_mask;
+    unsigned char priority_shift;
 };
 
 struct dma_channel
@@ -66,22 +69,34 @@ static const struct dma_interrupt_map dma_channel_interrupts[] =
     { 
         .ifs = atomic_reg_ptr_cast(&IFS2),
         .iec = atomic_reg_ptr_cast(&IEC2),
-        .mask = 0x00000100,
-    },
-    { 
-        .ifs = atomic_reg_ptr_cast(&IFS2),
-        .iec = atomic_reg_ptr_cast(&IEC2), 
-        .mask = 0x00000200,
-    },
-    { 
-        .ifs = atomic_reg_ptr_cast(&IFS2),
-        .iec = atomic_reg_ptr_cast(&IEC2),
-        .mask = 0x00000400,
+        .ipc = atomic_reg_ptr_cast(&IPC10),
+        .mask = BIT(8),
+        .priority_mask = MASK(0x7, 18),
+        .priority_shift = 18,
     },
     { 
         .ifs = atomic_reg_ptr_cast(&IFS2),
         .iec = atomic_reg_ptr_cast(&IEC2),
-        .mask = 0x00000800,
+        .ipc = atomic_reg_ptr_cast(&IPC10),
+        .mask = BIT(9),
+        .priority_mask = MASK(0x7, 26),
+        .priority_shift = 26,
+    },
+    { 
+        .ifs = atomic_reg_ptr_cast(&IFS2),
+        .iec = atomic_reg_ptr_cast(&IEC2),
+        .ipc = atomic_reg_ptr_cast(&IPC11),
+        .mask = BIT(10),
+        .priority_mask = MASK(0x7, 2),
+        .priority_shift = 2,
+    },
+    { 
+        .ifs = atomic_reg_ptr_cast(&IFS2),
+        .iec = atomic_reg_ptr_cast(&IEC2),
+        .ipc = atomic_reg_ptr_cast(&IPC11),
+        .mask = BIT(11),
+        .priority_mask = MASK(0x7, 10),
+        .priority_shift = 10,
     },
 };
 
@@ -168,10 +183,12 @@ void dma_configure(struct dma_channel* channel, struct dma_config config)
     // Configure interrupts
     atomic_reg_ptr_clr(dma_int->iec, dma_int->mask);
     atomic_reg_ptr_clr(dma_int->ifs, dma_int->mask);
+    atomic_reg_ptr_clr(dma_int->ipc, dma_int->priority_mask);
     atomic_reg_clr(dma_reg->dchint, DMA_DCHINT_CHBCIE_MASK);
     
     if(NULL != config.block_transfer_complete) {
         channel->block_transfer_complete = config.block_transfer_complete;
+        atomic_reg_ptr_set(dma_int->ipc, MASK(DMA_INTERRUPT_PRIORITY, dma_int->priority_shift) & dma_int->priority_mask);
         atomic_reg_set(dma_reg->dchint, DMA_DCHINT_CHBCIE_MASK);
     }
 
@@ -204,7 +221,7 @@ void dma_configure_cell(struct dma_channel* channel, unsigned short size)
     atomic_reg_value(channel->dma_reg->dchcsiz) = size;
 }
 
-void dma_configure_start_event(struct dma_channel* channel, struct dma_irq event)
+void dma_configure_start_event(struct dma_channel* channel, struct dma_event event)
 {
     ASSERT(channel != NULL);
     const struct dma_register_map* const dma_reg = channel->dma_reg;
@@ -212,12 +229,12 @@ void dma_configure_start_event(struct dma_channel* channel, struct dma_irq event
     atomic_reg_clr(dma_reg->dchecon, DMA_DCHECON_CHSIRQ_MASK);
     atomic_reg_clr(dma_reg->dchecon, DMA_DCHECON_SIRQEN_MASK);
     if(event.enable) {
-        atomic_reg_set(dma_reg->dchecon, ((unsigned int)event.irq_vector << DMA_DCHECON_CHSIRQ_SHIFT) & DMA_DCHECON_CHSIRQ_MASK);
+        atomic_reg_set(dma_reg->dchecon, MASK_SHIFT(event.irq_vector, DMA_DCHECON_CHSIRQ_SHIFT) & DMA_DCHECON_CHSIRQ_MASK);
         atomic_reg_set(dma_reg->dchecon, DMA_DCHECON_SIRQEN_MASK);
     }
 }
 
-void dma_configure_abort_event(struct dma_channel* channel, struct dma_irq event)
+void dma_configure_abort_event(struct dma_channel* channel, struct dma_event event)
 {
     ASSERT(channel != NULL);
     const struct dma_register_map* const dma_reg = channel->dma_reg;
@@ -225,7 +242,7 @@ void dma_configure_abort_event(struct dma_channel* channel, struct dma_irq event
     atomic_reg_clr(dma_reg->dchecon, DMA_DCHECON_CHAIRQ_MASK);
     atomic_reg_clr(dma_reg->dchecon, DMA_DCHECON_AIRQEN_MASK);
     if(event.enable) {
-        atomic_reg_set(dma_reg->dchecon, ((unsigned int)event.irq_vector << DMA_DCHECON_CHAIRQ_SHIFT) & DMA_DCHECON_CHAIRQ_MASK);
+        atomic_reg_set(dma_reg->dchecon, MASK_SHIFT(event.irq_vector, DMA_DCHECON_CHAIRQ_SHIFT) & DMA_DCHECON_CHAIRQ_MASK);
         atomic_reg_set(dma_reg->dchecon, DMA_DCHECON_AIRQEN_MASK);
     }    
 }
@@ -259,25 +276,25 @@ static void dma_handle_interrupt(struct dma_channel* channel)
     }
 }
 
-void __ISR(_DMA_0_VECTOR, IPL7AUTO)dma_interrupt0(void)
+void __ISR(_DMA_0_VECTOR, IPL7AUTO) dma_interrupt0(void)
 {
     static struct dma_channel *channel = &dma_channels[0];
     dma_handle_interrupt(channel);
 }
 
-void __ISR(_DMA_1_VECTOR, IPL7AUTO)dma_interrupt1(void)
+void __ISR(_DMA_1_VECTOR, IPL7AUTO) dma_interrupt1(void)
 {
     static struct dma_channel *channel = &dma_channels[1];
     dma_handle_interrupt(channel);
 }
 
-void __ISR(_DMA_2_VECTOR, IPL7AUTO)dma_interrupt2(void)
+void __ISR(_DMA_2_VECTOR, IPL7AUTO) dma_interrupt2(void)
 {
     static struct dma_channel *channel = &dma_channels[2];
     dma_handle_interrupt(channel);
 }
 
-void __ISR(_DMA_3_VECTOR, IPL7AUTO)dma_interrupt3(void)
+void __ISR(_DMA_3_VECTOR, IPL7AUTO) dma_interrupt3(void)
 {
     static struct dma_channel *channel = &dma_channels[3];
     dma_handle_interrupt(channel);

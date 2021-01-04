@@ -6,5 +6,6 @@
 bool tlc5940_busy(void);
 bool tlc5940_ready(void);
 bool tlc5940_update(void);
+void tlc5940_write_grayscale(unsigned int device, unsigned int channel, unsigned short value);
 
 #endif	/* TLC5940_H */

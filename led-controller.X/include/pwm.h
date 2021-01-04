@@ -3,10 +3,10 @@
 
 struct pwm_config
 {
-    void (*cycle_callback)(void);
+    void (*period_callback)(void);
     
+    unsigned int period_callback_div;
     unsigned int frequency;
-    unsigned int cycle_count;
     float duty;
 };
 

@@ -11,7 +11,7 @@
 // Below are the output compare related defines
 #define PWM_OC_PR(frequency)                (SYS_PB_CLOCK / (frequency * PWM_OC_PRESCALER) - 1)
 #define PWM_OC_DUTY(frequency, percentage)  ((PWM_OC_PR(frequency) + 1) * percentage)
-#define PWM_OC_PRESCALER                    2
+#define PWM_OC_PRESCALER                    1
 
 #define PWM_OC_GSCLK_PPS                    RPE5R
 #define PWM_OC_GSCLK_TRIS                   TRISE
@@ -24,7 +24,7 @@
 #define PWM_OC_OCR_REG                      OC4R
 
 #define PWM_OC_GSCLK_PPS_WORD               0xb
-#define PWM_OC_TCON_WORD                    BIT(15) | MASK(0x1, 4)
+#define PWM_OC_TCON_WORD                    BIT(15)
 #define PWM_OC_OCCON_WORD                   MASK(0x6, 0)
 
 #define PWM_OC_GSCLK_PIN_MASK               BIT(5)

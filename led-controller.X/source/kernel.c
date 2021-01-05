@@ -49,8 +49,8 @@ static const struct kernel_ttask* kernel_ttask_sorted_end = NULL;
 
 static void (*kernel_exec_func)(void) = NULL;
 
-static int elapsed_ticks = 0;
-static int previous_ticks = 0;
+static unsigned int elapsed_ticks = 0;
+static unsigned int previous_ticks = 0;
 
 void kernel_init(void)
 {

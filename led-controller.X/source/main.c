@@ -15,10 +15,11 @@ int main()
     dma_init();
     pwm_init();
     
-    // Wakeup bonzo for the kernel init
-    sys_wakeup_bonzo();
     kernel_init();
     sys_enable_global_interrupt();
+    
+    // Wakeup bonzo
+    sys_wakeup_bonzo();
     
     // Bonzo is always hungry... 
     while(SYS_BONZO_IS_HUNGRY) {

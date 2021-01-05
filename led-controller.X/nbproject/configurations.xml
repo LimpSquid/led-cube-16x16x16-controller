@@ -19,6 +19,8 @@
       <itemPath>include/tlc5940_config.h</itemPath>
       <itemPath>include/pwm.h</itemPath>
       <itemPath>include/toolbox.h</itemPath>
+      <itemPath>include/layer.h</itemPath>
+      <itemPath>include/layer_config.h</itemPath>
     </logicalFolder>
     <logicalFolder name="LinkerScript"
                    displayName="Linker Files"
@@ -40,6 +42,7 @@
       <itemPath>source/spi.c</itemPath>
       <itemPath>source/tlc5940.c</itemPath>
       <itemPath>source/pwm.c</itemPath>
+      <itemPath>source/layer.c</itemPath>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"
@@ -105,7 +108,7 @@
         <property key="generate-micro-compressed-code" value="false"/>
         <property key="isolate-each-function" value="false"/>
         <property key="make-warnings-into-errors" value="false"/>
-        <property key="optimization-level" value="-O1"/>
+        <property key="optimization-level" value=""/>
         <property key="place-data-into-section" value="false"/>
         <property key="post-instruction-scheduling" value="default"/>
         <property key="pre-instruction-scheduling" value="default"/>
@@ -264,7 +267,6 @@
         <property key="UART3" value="true"/>
         <property key="UART4" value="true"/>
         <property key="debugoptions.useswbreakpoints" value="true"/>
-        <property key="firmware.download.all" value="false"/>
         <property key="hwtoolclock.frcindebug" value="false"/>
         <property key="memories.aux" value="false"/>
         <property key="memories.bootflash" value="false"/>

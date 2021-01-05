@@ -53,8 +53,7 @@
 
 enum tlc5940_state
 {
-    TLC5940_INIT = 0,
-    TLC5940_IDLE,
+    TLC5940_IDLE = 0,
     TLC5940_UPDATE,
     TLC5940_UPDATE_DMA_START,
     TLC5940_UPDATE_DMA_WAIT,
@@ -88,7 +87,7 @@ static const struct spi_config tlc5940_spi_config =
 static const struct pwm_config tlc5940_pwm_config =
 {
     .duty = 0.5,
-    .frequency = 1000000,
+    .frequency = 10000000, // @Fixme: Can't seem to increase it to 30MHz
     .period_callback = &tlc5940_pwm_period_callback,
     .period_callback_div = 4096 // Every 4096 PWM periods (one GSCLK period), call the callback
 };
@@ -96,7 +95,7 @@ static const struct pwm_config tlc5940_pwm_config =
 static void (*tlc5940_latch_callback)(void) = NULL;
 static struct dma_channel* tlc5940_dma_channel = NULL;
 static struct spi_module* tlc5940_spi_module = NULL;
-static enum tlc5940_state tlc5940_state = TLC5940_INIT;
+static enum tlc5940_state tlc5940_state = TLC5940_IDLE;
 
 bool tlc5940_busy(void)
 {
@@ -120,11 +119,8 @@ bool tlc5940_update(void)
     return true;
 }
 
-bool tlc5940_configure_latch_callback(void (*callback)(void))
+bool tlc5940_set_latch_callback(void (*callback)(void))
 {
-    if(tlc5940_busy())
-        return false;
-    
     tlc5940_latch_callback = callback;
 }
 
@@ -217,11 +213,6 @@ deinit_dma:
 static void tlc5940_rtask_execute(void)
 {            
     switch(tlc5940_state) {
-        case TLC5940_INIT:
-            // @Todo: do some init stuff
-            tlc5940_state = TLC5940_IDLE;
-            break;
-        default:
         case TLC5940_IDLE:
             break;
         case TLC5940_UPDATE:
@@ -268,7 +259,7 @@ static void tlc5940_rtask_execute(void)
             }
             break;
         case TLC5940_UPDATE_CLEAR_BUFFER:
-            memset(tlc5940_frame_ptr, 0x00, TLC5940_BUFFER_SIZE);
+            memset(tlc5940_frame_ptr, 0xff, TLC5940_BUFFER_SIZE); 
             tlc5940_state = TLC5940_IDLE;
             break;
     }

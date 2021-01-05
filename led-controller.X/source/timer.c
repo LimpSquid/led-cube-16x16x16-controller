@@ -52,7 +52,7 @@ struct timer_module* timer_construct(int type, void (*execute)(struct timer_modu
     }
     
     // Configure timer, if found
-    if(timer != NULL) {
+    if(NULL != timer) {
         timer->interval = 0;
         timer->ticks = 0;
         timer->execute = execute;
@@ -66,13 +66,14 @@ struct timer_module* timer_construct(int type, void (*execute)(struct timer_modu
 
 void timer_destruct(struct timer_module* timer)
 {
-    ASSERT(timer != NULL);
+    ASSERT(NULL != timer);
+    
     timer->opt.assigned = false;
 }
 
 void timer_set_time(struct timer_module* timer, int time, int unit)
 {
-    ASSERT(timer != NULL);
+    ASSERT(NULL != timer);
     
     timer->interval = timer_compute_ticks(time, unit);
     timer->ticks = timer->interval;
@@ -80,7 +81,8 @@ void timer_set_time(struct timer_module* timer, int time, int unit)
 
 void timer_start(struct timer_module* timer, int time, int unit)
 {
-    ASSERT(timer != NULL);
+    ASSERT(NULL != timer);
+    
     timer->interval = timer_compute_ticks(time, unit);
     timer->ticks = timer->interval;
     timer->opt.timedout = false;
@@ -89,13 +91,15 @@ void timer_start(struct timer_module* timer, int time, int unit)
 
 void timer_stop(struct timer_module* timer)
 {
-    ASSERT(timer != NULL);
+    ASSERT(NULL != timer);
+    
     timer->opt.suspended = true;
 }
 
 void timer_restart(struct timer_module* timer)
 {
-    ASSERT(timer != NULL);
+    ASSERT(NULL != timer);
+    
     timer->ticks = timer->interval;
     timer->opt.timedout = false;
     timer->opt.suspended = false;
@@ -103,13 +107,15 @@ void timer_restart(struct timer_module* timer)
 
 bool timer_timed_out(const struct timer_module* timer)
 {
-    ASSERT(timer != NULL);
+    ASSERT(NULL != timer);
+    
     return timer->opt.timedout;
 }
 
 bool timer_is_valid(const struct timer_module* timer)
 {
-    ASSERT(timer != NULL);
+    ASSERT(NULL != timer);
+    
     return timer->opt.assigned;
 }
 
@@ -159,14 +165,14 @@ static void timer_ttask_execute(void)
             if(timer->opt.timedout) {
                 switch(timer->opt.type) {
                     case TIMER_TYPE_SOFT:
-                        if(execute == NULL) { // Yay, we can execute this timer's handle
+                        if(NULL == execute) { // Yay, we can execute this timer's handle
                             timer->ticks = timer->interval; // Reset tick count
                             timer->opt.timedout = false;
                             execute = timer->execute; 
                         }
                         break;
                     case TIMER_TYPE_SINGLE_SHOT:
-                        if(execute == NULL) {
+                        if(NULL == execute) {
                             timer->opt.suspended = true;
                             execute = timer->execute;
                         } 
@@ -182,7 +188,7 @@ static void timer_ttask_execute(void)
         timer++; // Advance to next timer
     }
     
-    if(execute != NULL)
+    if(NULL != execute)
         (*execute)(timer);
 }
 

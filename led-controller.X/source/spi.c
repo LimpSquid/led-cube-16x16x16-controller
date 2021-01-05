@@ -107,7 +107,7 @@ struct spi_module* spi_construct(enum spi_channel channel, struct spi_config con
 
 void spi_destruct(struct spi_module* module)
 {
-    ASSERT(module != NULL);
+    ASSERT(NULL != module);
     
     atomic_reg_clr(module->spi_reg->spicon, SPI_ON);
     module->assigned = false;
@@ -115,7 +115,7 @@ void spi_destruct(struct spi_module* module)
 
 void spi_configure(struct spi_module* module, struct spi_config config)
 {
-    ASSERT(module != NULL);
+    ASSERT(NULL != module);
     const struct spi_register_map* const spi_reg = module->spi_reg;
     const struct spi_interrupt_map* const spi_int = module->spi_int;
     
@@ -148,8 +148,8 @@ void spi_configure(struct spi_module* module, struct spi_config config)
 
 void spi_configure_dma_src(struct spi_module* module, struct dma_channel* channel)
 {
-    ASSERT(module != NULL);
-    ASSERT(channel != NULL);
+    ASSERT(NULL != module);
+    ASSERT(NULL != channel);
     unsigned int spicon = atomic_reg_value(module->spi_reg->spicon);
     struct dma_event start_event =
     {
@@ -171,8 +171,8 @@ void spi_configure_dma_src(struct spi_module* module, struct dma_channel* channe
 
 void spi_configure_dma_dst(struct spi_module* module, struct dma_channel* channel)
 {
-    ASSERT(module != NULL);
-    ASSERT(channel != NULL);
+    ASSERT(NULL != module);
+    ASSERT(NULL != channel);
     unsigned int spicon = atomic_reg_value(module->spi_reg->spicon);
     struct dma_event start_event =
     {
@@ -194,21 +194,21 @@ void spi_configure_dma_dst(struct spi_module* module, struct dma_channel* channe
 
 void spi_enable(struct spi_module* module)
 {
-    ASSERT(module != NULL);
+    ASSERT(NULL != module);
     
     atomic_reg_set(module->spi_reg->spicon, SPI_ON);
 }
 
 void spi_disable(struct spi_module* module)
 {
-    ASSERT(module != NULL);
+    ASSERT(NULL != module);
     
     atomic_reg_clr(module->spi_reg->spicon, SPI_ON);
 }
 
 bool spi_transmit(struct spi_module* module, unsigned int* buffer, unsigned char size)
 {
-    ASSERT(module != NULL);
+    ASSERT(NULL != module);
     ASSERT(atomic_reg_value(module->spi_reg->spicon) & SPI_ON);
     const struct spi_register_map* const spi_reg = module->spi_reg;
     bool result = false;

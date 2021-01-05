@@ -93,6 +93,7 @@ static const struct pwm_config tlc5940_pwm_config =
     .period_callback_div = 4096 // Every 4096 PWM periods (one GSCLK period), call the callback
 };
 
+static void (*tlc5940_latch_callback)(void) = NULL;
 static struct dma_channel* tlc5940_dma_channel = NULL;
 static struct spi_module* tlc5940_spi_module = NULL;
 static enum tlc5940_state tlc5940_state = TLC5940_INIT;
@@ -117,6 +118,14 @@ bool tlc5940_update(void)
     tlc5940_draw_ptr = frame_ptr;
     tlc5940_state = TLC5940_UPDATE;
     return true;
+}
+
+bool tlc5940_configure_latch_callback(void (*callback)(void))
+{
+    if(tlc5940_busy())
+        return false;
+    
+    tlc5940_latch_callback = callback;
 }
 
 void tlc5940_write_grayscale(unsigned int device, unsigned int channel, unsigned short value)
@@ -248,6 +257,9 @@ static void tlc5940_rtask_execute(void)
                 REG_INV(TLC5940_SCK_LAT, TLC5940_SCK_PIN_MASK);
                 spi_enable(tlc5940_spi_module);
 
+                if(NULL != tlc5940_latch_callback)
+                    tlc5940_latch_callback();
+                
                 // Enable outputs and PWM
                 REG_CLR(TLC5940_BLANK_LAT, TLC5940_BLANK_PIN_MASK);
                 pwm_enable();

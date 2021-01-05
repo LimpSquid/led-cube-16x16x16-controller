@@ -40,7 +40,7 @@ static int print_str_puts(void* data, const char* str, unsigned int size);
 int print_fs(char* str, const char* format, ...)
 {
     int result = 0;
-    if(str != NULL) {
+    if(NULL != str) {
         va_list arg;
         va_start(arg, format);
         struct print_string str_data = { .buffer = str, .offset = 0 };
@@ -53,7 +53,7 @@ int print_fs(char* str, const char* format, ...)
 int print_vfs(char* str, const char* format, va_list arg)
 {
     int result = 0;
-    if(str != NULL) {
+    if(NULL != str) {
         struct print_string str_data = { .buffer = str, .offset = 0 };
         result = print_format(format, arg, &str_data, print_str_puts);
     }

@@ -102,7 +102,7 @@ struct uart_error_status uart_error_status(void)
 
 void uart_error_register_notifier(void (*callback)(struct uart_error_status), struct uart_error_notifier* const notifier)
 {
-    if(callback != NULL && notifier != NULL) {
+    if(NULL != callback && NULL != notifier) {
         notifier->callback = callback;
         
         // Update linked list
@@ -141,8 +141,8 @@ void uart_transmit(unsigned char data)
 
 void uart_transmit_buffer(unsigned char* buffer, unsigned int size)
 {
-    ASSERT(buffer != NULL);
-    ASSERT(size != 0);
+    ASSERT(NULL != buffer);
+    ASSERT(0 != size);
     
     // @Todo: improve performance
     while(size-- > 0)
@@ -166,7 +166,7 @@ unsigned char uart_read(void)
 
 int uart_read_buffer(unsigned char* buffer, unsigned int max_size)
 {
-    ASSERT(buffer != NULL);
+    ASSERT(NULL != buffer);
     ASSERT(uart_rx_consumer != uart_rx_consumer);
     
     //@Todo: improve performance
@@ -210,7 +210,7 @@ static void uart_error_callback(struct uart_error_status error)
 static void uart_error_notify()
 {
     const struct uart_error_notifier* notifier = &uart_notifier;
-    while(notifier != NULL) {
+    while(NULL != notifier) {
         notifier->callback(uart_error.status);
         notifier = notifier->next;
     }

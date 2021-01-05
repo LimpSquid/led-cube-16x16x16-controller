@@ -83,7 +83,7 @@ void kernel_execute(void)
 
 void kernel_ttask_set_priority(struct kernel_ttask_param* const ttask_param, int priority)
 {
-    if(ttask_param != NULL) {
+    if(NULL != ttask_param) {
         if(priority < 0 || priority >= __KERN_TTASK_PRIORITY_COUNT)
             priority = KERN_TTASK_PRIORITY_NORMAL;
         ttask_param->priority = priority;
@@ -92,14 +92,14 @@ void kernel_ttask_set_priority(struct kernel_ttask_param* const ttask_param, int
 
 void kernel_ttask_set_interval(struct kernel_ttask_param* const ttask_param, int time, int unit)
 {
-    if(ttask_param != NULL)
+    if(NULL != ttask_param)
         ttask_param->interval = kernel_compute_sys_ticks(time, unit);
 }
 
 static void kernel_init_configure_ttask(void)
 {
     while(kernel_ttask_iterator != kernel_ttask_end) {
-        if(kernel_ttask_iterator->configure != NULL)
+        if(NULL != kernel_ttask_iterator->configure)
             (*kernel_ttask_iterator->configure)(kernel_ttask_iterator->param);
         kernel_ttask_iterator++;
     }
@@ -109,7 +109,7 @@ static void kernel_init_configure_ttask(void)
 static void kernel_init_configure_rtask(void)
 {
     while(kernel_rtask_iterator != kernel_rtask_end) {
-        if(kernel_rtask_iterator->configure != NULL)
+        if(NULL != kernel_rtask_iterator->configure)
             (*kernel_rtask_iterator->configure)(kernel_rtask_iterator->param);
         kernel_rtask_iterator++;
     }
@@ -124,11 +124,11 @@ static void kernel_init_ttask_call_sequence(void)
     do {
         while(kernel_ttask_iterator != kernel_ttask_end) {
             // Find task with current priority, and check if it is not assigned already
-            if(kernel_ttask_iterator->param->priority == priority && kernel_ttask_iterator->param->next == NULL) {
+            if(kernel_ttask_iterator->param->priority == priority && NULL == kernel_ttask_iterator->param->next) {
                 // Ignore the previously found ttask, because we still have to assign the next task 
                 if(&kernel_ttask_iterator->param->next != ttask) {
                     // First ttask in call sequence
-                    if(ttask == NULL)
+                    if(NULL == ttask)
                         kernel_ttask_sorted_begin = kernel_ttask_iterator;
                     else
                         *ttask = kernel_ttask_iterator;
@@ -147,7 +147,7 @@ static void kernel_init_ttask_call_sequence(void)
     } while(priority >= 0);
     
     // Create circular dependency
-    if(ttask != NULL)
+    if(NULL != ttask)
         *ttask = kernel_ttask_sorted_begin;
     kernel_restore_ttask_sorted_iterator();
 }
@@ -180,8 +180,8 @@ static void kernel_init_task_init(void)
         }
         
         // Check if we have found a init function to process...
-        if(init_done != NULL) {
-            if(init != NULL)
+        if(NULL != init_done) {
+            if(NULL != init)
                 (*init)();
             *init_done = true;
         } else // If not, we go to the next init_level

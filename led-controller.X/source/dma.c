@@ -147,14 +147,14 @@ struct dma_channel* dma_construct(struct dma_config config)
     }
     
     // Configure channel, if found
-    if(channel != NULL)
+    if(NULL != channel)
         dma_configure(channel, config);
     return channel;
 }
 
 void dma_destruct(struct dma_channel* channel)
 {
-    ASSERT(channel != NULL);
+    ASSERT(NULL != channel);
     
     atomic_reg_clr(channel->dma_reg->dchcon, DMA_DCHCON_CHEN_MASK);
     channel->assigned = false;
@@ -162,7 +162,7 @@ void dma_destruct(struct dma_channel* channel)
 
 void dma_configure(struct dma_channel* channel, struct dma_config config)
 {    
-    ASSERT(channel != NULL);
+    ASSERT(NULL != channel);
     const struct dma_register_map* const dma_reg = channel->dma_reg;
     const struct dma_interrupt_map* const dma_int = channel->dma_int;
     
@@ -198,7 +198,7 @@ void dma_configure(struct dma_channel* channel, struct dma_config config)
 }
 void dma_configure_src(struct dma_channel* channel, const void* mem, unsigned short size)
 {
-    ASSERT(channel != NULL);
+    ASSERT(NULL != channel);
     const struct dma_register_map* const dma_reg = channel->dma_reg;
     
     atomic_reg_value(dma_reg->dchssa) = DMA_PHY_ADDR(mem);
@@ -207,7 +207,7 @@ void dma_configure_src(struct dma_channel* channel, const void* mem, unsigned sh
 
 void dma_configure_dst(struct dma_channel* channel, const void* mem, unsigned short size)
 {
-    ASSERT(channel != NULL);
+    ASSERT(NULL != channel);
     const struct dma_register_map* const dma_reg = channel->dma_reg;
     
     atomic_reg_value(dma_reg->dchdsa) = DMA_PHY_ADDR(mem);
@@ -216,14 +216,14 @@ void dma_configure_dst(struct dma_channel* channel, const void* mem, unsigned sh
 
 void dma_configure_cell(struct dma_channel* channel, unsigned short size)
 {
-    ASSERT(channel != NULL);
+    ASSERT(NULL != channel);
 
     atomic_reg_value(channel->dma_reg->dchcsiz) = size;
 }
 
 void dma_configure_start_event(struct dma_channel* channel, struct dma_event event)
 {
-    ASSERT(channel != NULL);
+    ASSERT(NULL != channel);
     const struct dma_register_map* const dma_reg = channel->dma_reg;
     
     atomic_reg_clr(dma_reg->dchecon, DMA_DCHECON_CHSIRQ_MASK);
@@ -236,7 +236,7 @@ void dma_configure_start_event(struct dma_channel* channel, struct dma_event eve
 
 void dma_configure_abort_event(struct dma_channel* channel, struct dma_event event)
 {
-    ASSERT(channel != NULL);
+    ASSERT(NULL != channel);
     const struct dma_register_map* const dma_reg = channel->dma_reg;
     
     atomic_reg_clr(dma_reg->dchecon, DMA_DCHECON_CHAIRQ_MASK);
@@ -249,14 +249,14 @@ void dma_configure_abort_event(struct dma_channel* channel, struct dma_event eve
 
 void dma_enable_transfer(struct dma_channel* channel)
 {
-    ASSERT(channel != NULL);
+    ASSERT(NULL != channel);
     
     atomic_reg_set(channel->dma_reg->dchcon, DMA_DCHCON_CHEN_MASK);
 }
 
 bool dma_busy(struct dma_channel* channel)
 {
-    ASSERT(channel != NULL);
+    ASSERT(NULL != channel);
     
     return atomic_reg_value(channel->dma_reg->dchcon) & DMA_DCHCON_CHBUSY_MASK;
 }

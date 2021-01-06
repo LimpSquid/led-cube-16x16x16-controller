@@ -7,7 +7,7 @@
 #include <stddef.h>
 #include <xc.h>
 
-#ifndef LAYER_REFRESH_INTERVAL
+#if !defined(LAYER_REFRESH_INTERVAL)
     #error "Layer refresh interval is not specified, please define 'LAYER_REFRESH_INTERVAL'"
 #endif
 
@@ -81,7 +81,7 @@ static void layer_latch_callback(void)
     
     // Advance to next row
     layer_row_previous_io = layer_row_io;
-    if(layer_row_index++ >= LAYER_NUM_OF_ROWS) {
+    if(++layer_row_index >= LAYER_NUM_OF_ROWS) {
         layer_row_index = 0;
         layer_row_io = layer_io;
     } else

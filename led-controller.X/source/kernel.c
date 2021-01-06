@@ -4,11 +4,21 @@
 #include <xc.h>
 #include <stddef.h>
 
-#if defined(KERN_TMR_CLK_FREQ)
-    #define SYSTEM_TICK ((1000000.0F / KERN_TMR_CLK_FREQ) * KERN_TMR_PRESCALER)
-#else
-    #error "System tick could not be calculated, please define the KERN_TMR_CLK_FREQ."
+#if !defined(KERN_TMR_REG)
+    #error "Timer register not specified, please define 'KERN_TMR_REG'"
+#elif !defined(KERN_TMR_REG_DATA_TYPE)
+    #error "Timer register data type register not specified, please define 'KERN_TMR_REG_DATA_TYPE'"
+#elif !defined(KERN_TMR_CFG_REG)
+    #error "Timer config register not specified, please define 'KERN_TMR_CFG_REG'"
+#elif !defined(KERN_TMR_CFG_WORD)
+    #error "Timer config register word not specified, please define 'KERN_TMR_CFG_WORD'"
+#elif !defined(KERN_TMR_EN_BIT)
+    #error "Timer enable bit from config register not specified, please define 'KERN_TMR_EN_BIT'"
+#elif !defined(KERN_TMR_CLKIN_FREQ)
+    #error "System tick could not be calculated, please define 'KERN_TMR_CLKIN_FREQ'"
 #endif
+
+#define KERNEL_SYSTEM_TICK ((1000000.0F / KERN_TMR_CLKIN_FREQ) * KERN_TMR_PRESCALER)
 
 #define kernel_restore_rtask_iterator()                                 \
             kernel_rtask_iterator = &__kernel_rstack_begin
@@ -22,6 +32,8 @@
 
 #define kernel_ttask_size()                                             \
             (int)(&__kernel_tstack_end - &__kernel_tstack_begin)
+
+typedef KERN_TMR_REG_DATA_TYPE timer_size_t;
 
 static void kernel_init_configure_ttask(void);
 static void kernel_init_configure_rtask(void);
@@ -49,8 +61,8 @@ static const struct kernel_ttask* kernel_ttask_sorted_end = NULL;
 
 static void (*kernel_exec_func)(void) = NULL;
 
-static unsigned int elapsed_ticks = 0;
-static unsigned int previous_ticks = 0;
+static timer_size_t elapsed_ticks = 0;
+static timer_size_t previous_ticks = 0;
 
 void kernel_init(void)
 {
@@ -194,33 +206,15 @@ static void kernel_init_task_init(void)
 
 static void kernel_execute_ttask_rtask(void)
 {
-    struct kernel_ttask_param* param;
-    
-    elapsed_ticks = KERN_TMR_REG - previous_ticks;
-    previous_ticks += elapsed_ticks;
-    
-    do {
-        param = kernel_ttask_sorted_iterator->param;
-        if(param->ticks <= elapsed_ticks) {
-            param->ticks = param->interval;
-            kernel_ttask_sorted_iterator->exec();
-        } else
-            param->ticks -= elapsed_ticks;
-        
-        kernel_ttask_sorted_iterator = param->next;
-    } while(kernel_ttask_sorted_iterator != kernel_ttask_sorted_begin);
-    kernel_restore_ttask_sorted_iterator();
-    
-    kernel_rtask_iterator->exec();
-    if(++kernel_rtask_iterator == kernel_rtask_end)
-        kernel_restore_rtask_iterator();
+    kernel_execute_ttask();
+    kernel_execute_rtask();
 }
 
 static void kernel_execute_ttask(void)
 {
     struct kernel_ttask_param* param;
     
-    elapsed_ticks = KERN_TMR_REG - previous_ticks;
+    elapsed_ticks = (timer_size_t)(KERN_TMR_REG - previous_ticks);
     previous_ticks += elapsed_ticks;
     
     do {
@@ -233,7 +227,6 @@ static void kernel_execute_ttask(void)
         
         kernel_ttask_sorted_iterator = param->next;
     } while(kernel_ttask_sorted_iterator != kernel_ttask_sorted_begin);
-    kernel_restore_ttask_sorted_iterator();
 }
 
 static void kernel_execute_rtask(void)
@@ -253,9 +246,9 @@ static int kernel_compute_sys_ticks(int time, int unit)
     int ticks;
     switch(unit) {
         default: // Default to seconds
-        case KERN_TIME_UNIT_S:  ticks = (time * 1000000LU) / SYSTEM_TICK;   break;
-        case KERN_TIME_UNIT_MS: ticks = (time * 1000LU) / SYSTEM_TICK;      break;
-        case KERN_TIME_UNIT_US: ticks = time / SYSTEM_TICK;                 break;
+        case KERN_TIME_UNIT_S:  ticks = (time * 1000000LU) / KERNEL_SYSTEM_TICK;    break;
+        case KERN_TIME_UNIT_MS: ticks = (time * 1000LU) / KERNEL_SYSTEM_TICK;       break;
+        case KERN_TIME_UNIT_US: ticks = time / KERNEL_SYSTEM_TICK;                  break;
     }
     return ticks;
 }

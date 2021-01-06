@@ -9,13 +9,13 @@
 #include <stddef.h>
 #include <string.h>
 
-#ifndef TLC5940_NUM_OF_DEVICES
+#if !defined(TLC5940_NUM_OF_DEVICES)
     #error "Number of TLC5940 devices is not specified, please define 'TLC5940_NUM_OF_DEVICES'"
 #endif
 
-#define TLC5940_BYTES_PER_DEVICE        24
 #define TLC5940_CHANNELS_PER_DEVICE     16
-#define TLC5940_BUFFER_SIZE             (TLC5940_BYTES_PER_DEVICE * TLC5940_NUM_OF_DEVICES)
+#define TLC5940_BUFFER_SIZE             (24 * TLC5940_NUM_OF_DEVICES)
+#define TLC5940_BUFFER_SIZE_DOT_CORR    (12 * TLC5940_NUM_OF_DEVICES)
 #define TLC5940_CHANNEL_SIZE            (TLC5940_CHANNELS_PER_DEVICE * TLC5940_NUM_OF_DEVICES)
 
 // @Todo: change to actual SPI channel and pins
@@ -53,13 +53,15 @@
 
 enum tlc5940_state
 {
-    TLC5940_IDLE = 0,
+    TLC5940_INIT = 0,
+    TLC5940_WRITE_DOT_CORRECTION,
+    TLC5940_IDLE,
     TLC5940_UPDATE,
     TLC5940_UPDATE_DMA_START,
     TLC5940_UPDATE_DMA_WAIT,
-    TLC5940_UPDATE_PERIOD_SYNC,
     TLC5940_UPDATE_LATCH,
     TLC5940_UPDATE_CLEAR_BUFFER,
+    TLC5940_UPDATE_CLEAR_BUFFER_WAIT,
 };
 
 static void tlc5940_pwm_period_callback(void);
@@ -69,9 +71,9 @@ KERN_QUICK_RTASK(tlc5940, tlc5940_rtask_init, tlc5940_rtask_execute);
 
 static unsigned char tlc5940_front_buffer[TLC5940_BUFFER_SIZE]; // Must be made available before the DMA config
 static unsigned char tlc5940_back_buffer[TLC5940_BUFFER_SIZE];
+static unsigned char tlc5940_dot_corr_buffer[TLC5940_BUFFER_SIZE_DOT_CORR];
 static unsigned char* tlc5940_frame_ptr = tlc5940_back_buffer;
 static unsigned char* tlc5940_draw_ptr = tlc5940_front_buffer;
-static bool tlc5940_period_sync = false;
 
 static const struct dma_config tlc5940_dma_config =
 {
@@ -87,7 +89,7 @@ static const struct spi_config tlc5940_spi_config =
 static const struct pwm_config tlc5940_pwm_config =
 {
     .duty = 0.5,
-    .frequency = 10000000, // @Fixme: Can't seem to increase it to 30MHz
+    .frequency = 5000000,
     .period_callback = &tlc5940_pwm_period_callback,
     .period_callback_div = 4096 // Every 4096 PWM periods (one GSCLK period), call the callback
 };
@@ -95,7 +97,7 @@ static const struct pwm_config tlc5940_pwm_config =
 static void (*tlc5940_latch_callback)(void) = NULL;
 static struct dma_channel* tlc5940_dma_channel = NULL;
 static struct spi_module* tlc5940_spi_module = NULL;
-static enum tlc5940_state tlc5940_state = TLC5940_IDLE;
+static enum tlc5940_state tlc5940_state = TLC5940_INIT;
 
 bool tlc5940_busy(void)
 {
@@ -153,11 +155,13 @@ static void tlc5940_pwm_period_callback(void)
 {
     REG_SET(TLC5940_BLANK_LAT, TLC5940_BLANK_PIN_MASK);
     REG_CLR(TLC5940_BLANK_LAT, TLC5940_BLANK_PIN_MASK);
-    tlc5940_period_sync = true;
 }
 
 static int tlc5940_rtask_init(void)
 {
+    // Init variables
+    memset(tlc5940_dot_corr_buffer, 0xff, TLC5940_BUFFER_SIZE_DOT_CORR);
+    
     // Configure PPS
     sys_unlock();
     TLC5940_SDO_PPS = TLC5940_SDO_PPS_WORD;
@@ -213,6 +217,16 @@ deinit_dma:
 static void tlc5940_rtask_execute(void)
 {            
     switch(tlc5940_state) {
+        case TLC5940_INIT:
+            // no break
+        case TLC5940_WRITE_DOT_CORRECTION:
+            REG_SET(TLC5940_VPRG_LAT, TLC5940_VPRG_PIN_MASK);
+            spi_transmit_mode8(tlc5940_spi_module, tlc5940_dot_corr_buffer, TLC5940_BUFFER_SIZE_DOT_CORR);
+            REG_SET(TLC5940_XLAT_LAT, TLC5940_XLAT_PIN_MASK);
+            REG_CLR(TLC5940_XLAT_LAT, TLC5940_XLAT_PIN_MASK);
+            REG_CLR(TLC5940_VPRG_LAT, TLC5940_VPRG_PIN_MASK);
+            tlc5940_state = TLC5940_IDLE;
+            break;
         case TLC5940_IDLE:
             break;
         case TLC5940_UPDATE:
@@ -225,41 +239,26 @@ static void tlc5940_rtask_execute(void)
             break;
         case TLC5940_UPDATE_DMA_WAIT:
             if(dma_ready(tlc5940_dma_channel))
-                tlc5940_state = TLC5940_UPDATE_PERIOD_SYNC;
+                tlc5940_state = TLC5940_UPDATE_LATCH;
             break;
-        case TLC5940_UPDATE_PERIOD_SYNC:
-            tlc5940_period_sync = false;
-            tlc5940_state = TLC5940_UPDATE_LATCH;
-            // no break
         case TLC5940_UPDATE_LATCH:
-            // Wait until the GSCLK period is synced
-            if(tlc5940_period_sync) {
-                // Disable PWM and clear outputs
-                pwm_disable();
-                REG_SET(TLC5940_BLANK_LAT, TLC5940_BLANK_PIN_MASK);
+            // Latch in data
+            REG_SET(TLC5940_XLAT_LAT, TLC5940_XLAT_PIN_MASK);
+            REG_CLR(TLC5940_XLAT_LAT, TLC5940_XLAT_PIN_MASK);
 
-                // Latch in data
-                REG_SET(TLC5940_XLAT_LAT, TLC5940_XLAT_PIN_MASK);
-                REG_CLR(TLC5940_XLAT_LAT, TLC5940_XLAT_PIN_MASK);
+            // Shift diagnostic data
+            spi_disable(tlc5940_spi_module);
+            REG_INV(TLC5940_SCK_LAT, TLC5940_SCK_PIN_MASK);
+            REG_INV(TLC5940_SCK_LAT, TLC5940_SCK_PIN_MASK);
+            spi_enable(tlc5940_spi_module);
 
-                // Shift diagnostic data
-                spi_disable(tlc5940_spi_module);
-                REG_INV(TLC5940_SCK_LAT, TLC5940_SCK_PIN_MASK);
-                REG_INV(TLC5940_SCK_LAT, TLC5940_SCK_PIN_MASK);
-                spi_enable(tlc5940_spi_module);
+            if(NULL != tlc5940_latch_callback)
+                tlc5940_latch_callback();
 
-                if(NULL != tlc5940_latch_callback)
-                    tlc5940_latch_callback();
-                
-                // Enable outputs and PWM
-                REG_CLR(TLC5940_BLANK_LAT, TLC5940_BLANK_PIN_MASK);
-                pwm_enable();
-
-                tlc5940_state = TLC5940_UPDATE_CLEAR_BUFFER;
-            }
+            tlc5940_state = TLC5940_UPDATE_CLEAR_BUFFER;
             break;
         case TLC5940_UPDATE_CLEAR_BUFFER:
-            memset(tlc5940_frame_ptr, 0xff, TLC5940_BUFFER_SIZE); 
+            memset(tlc5940_frame_ptr, 0x00, TLC5940_BUFFER_SIZE);
             tlc5940_state = TLC5940_IDLE;
             break;
     }

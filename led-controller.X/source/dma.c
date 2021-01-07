@@ -146,9 +146,11 @@ struct dma_channel* dma_construct(struct dma_config config)
         }
     }
     
-    // Configure channel, if found
-    if(NULL != channel)
+    // Assign and configure channel, if found
+    if(NULL != channel) {
+        channel->assigned = true;
         dma_configure(channel, config);
+    }
     return channel;
 }
 

@@ -100,7 +100,8 @@ struct spi_module* spi_construct(enum spi_channel channel, struct spi_config con
     if(module->assigned)
         return NULL;
     
-    // Configure module
+    // Assign and configure module
+    module->assigned = true;
     spi_configure(module, config);
     return module;
 }
@@ -132,7 +133,7 @@ void spi_configure(struct spi_module* module, struct spi_config config)
     atomic_reg_ptr_clr(spi_int->ifs, spi_int->transfer_mask);
     
     // Configure SPI
-    atomic_reg_value(spi_reg->spibrg) = SPI_BRG(config.baudrate);
+    atomic_reg_value(spi_reg->spibrg) = config.baudrate > 0 ? SPI_BRG(config.baudrate) : 0;
     atomic_reg_value(spi_reg->spicon) = config.spicon_flags;
     module->fifo_depth = SPI_FIFO_DEPTH_MODE8;
     module->fifo_size = SPI_FIFO_SIZE_MODE8;

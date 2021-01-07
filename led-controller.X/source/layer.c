@@ -2,6 +2,9 @@
 #include "../include/layer_config.h"
 #include "../include/kernel_task.h"
 #include "../include/tlc5940.h"
+#include "../include/spi.h"
+#include "../include/dma.h"
+#include "../include/sys.h"
 #include "../include/register.h"
 #include "../include/toolbox.h"
 #include <stddef.h>
@@ -12,6 +15,9 @@
 #endif
 
 #define LAYER_NUM_OF_ROWS           16
+#define LAYER_NUM_OF_COLS           16
+#define LAYER_FRAME_DEPTH           3 // RGB
+#define LAYER_FRAME_BUFFER_SIZE     (LAYER_NUM_OF_COLS * LAYER_NUM_OF_ROWS * LAYER_FRAME_DEPTH)
 #define LAYER_IO(pin, bank) \
     { \
         .ansel = NULL, \
@@ -26,7 +32,23 @@
         .lat = atomic_reg_ptr_cast(&LAT##bank), \
         .mask = BIT(pin) \
     }
-   
+
+#define LAYER_SPI_CHANNEL               SPI_CHANNEL1
+#define LAYER_SDI_PPS                   SDI1R
+#define LAYER_SS_PPS                    SS1R
+
+#define LAYER_SDI_TRIS                  TRISF
+#define LAYER_SCK_TRIS                  TRISF
+#define LAYER_SS_TRIS                   TRISB
+
+#define LAYER_SS_ANSEL                  ANSELB 
+
+#define LAYER_SDI_PPS_WORD              0xe
+#define LAYER_SS_PPS_WORD               0x3
+#define LAYER_SDI_PIN_MASK              BIT(2)
+#define LAYER_SCK_PIN_MASK              BIT(6)
+#define LAYER_SS_PIN_MASK               BIT(15)
+
 struct layer_io
 {
     atomic_reg_ptr(ansel);
@@ -39,15 +61,19 @@ struct layer_io
 enum layer_state
 {
     LAYER_IDLE = 0,
+    LAYER_RECEIVE_FRAME,
+    LAYER_RECEIVE_FRAME_DMA_START,
+    LAYER_RECEIVE_FRAME_DMA_WAIT,
 };
 
 static void layer_latch_callback(void);
 static int layer_ttask_init(void);
 static void layer_ttask_execute(void);
 static void layer_ttask_configure(struct kernel_ttask_param* const param);
+static int layer_rtask_init(void);
 static void layer_rtask_execute(void);
 KERN_TTASK(layer, layer_ttask_init, layer_ttask_execute, layer_ttask_configure, KERN_INIT_LATE);
-KERN_QUICK_RTASK(layer, NULL, layer_rtask_execute); // No init necessary
+KERN_QUICK_RTASK(layer, layer_rtask_init, layer_rtask_execute); // No init necessary
 
 static const struct layer_io layer_io[LAYER_NUM_OF_ROWS] =
 {
@@ -69,10 +95,41 @@ static const struct layer_io layer_io[LAYER_NUM_OF_ROWS] =
     LAYER_IO(8, D),
 };
 
+static const struct dma_config layer_dma_config; // No special config needed
+static const struct spi_config layer_spi_config =
+{
+    .spicon_flags = SPI_SRXISEL_NOT_EMPTY | SPI_DISSDO | SPI_MODE8 | SPI_SSEN,
+};
+
+static unsigned char layer_front_buffer[LAYER_FRAME_BUFFER_SIZE];
+static unsigned char layer_back_buffer[LAYER_FRAME_BUFFER_SIZE];
+static unsigned char* layer_dma_ptr = layer_back_buffer;
+static unsigned char* layer_draw_ptr = layer_front_buffer;
 static const struct layer_io* layer_row_io = layer_io;
 static const struct layer_io* layer_row_previous_io = &layer_io[LAYER_NUM_OF_ROWS - 1];
+static struct dma_channel* layer_dma_channel = NULL;
+static struct spi_module* layer_spi_module = NULL;
 static enum layer_state layer_state = LAYER_IDLE;
 static unsigned int layer_row_index = 0;
+
+bool layer_busy(void)
+{
+    return layer_state != LAYER_IDLE;
+}
+
+bool layer_ready(void)
+{
+    return !layer_busy();
+}
+
+bool layer_receive_frame(void)
+{
+    if(layer_busy())
+        return false;
+    
+    layer_state = LAYER_RECEIVE_FRAME;
+    return true;
+}
 
 static void layer_latch_callback(void)
 {
@@ -109,8 +166,20 @@ static int layer_ttask_init(void)
 
 static void layer_ttask_execute(void)
 {
-    if(tlc5940_ready())
+    if(tlc5940_ready()) {
+        // @Commit: temporary stuff
+        int offset = LAYER_NUM_OF_COLS * layer_row_index;
+        for(unsigned int i = 0; i < LAYER_NUM_OF_COLS; i++) {
+            //tlc5940_write_grayscale(0, i, 0xffff);
+            //tlc5940_write_grayscale(1, i, 0xffff);
+            tlc5940_write_grayscale(2, i, 0xffff);
+            // Convert 8 bit to 12 bit equivalent
+//           tlc5940_write_grayscale(0, i, (layer_dma_ptr[i + offset] << 4) | (layer_dma_ptr[i + offset] >> 4));
+//           tlc5940_write_grayscale(1, i, (layer_dma_ptr[i + offset + 256] << 4) | (layer_dma_ptr[i + offset + 256] >> 4));
+//           tlc5940_write_grayscale(2, i, (layer_dma_ptr[i + offset + 512] << 4) | (layer_dma_ptr[i + offset + 512] >> 4));
+        }
         tlc5940_update();
+    }
 }
 
 static void layer_ttask_configure(struct kernel_ttask_param* const param)
@@ -119,11 +188,61 @@ static void layer_ttask_configure(struct kernel_ttask_param* const param)
     kernel_ttask_set_interval(param, LAYER_REFRESH_INTERVAL, KERN_TIME_UNIT_US);
 }
  
+static int layer_rtask_init(void)
+{
+    // Configure PPS
+    sys_unlock();
+    LAYER_SDI_PPS = LAYER_SDI_PPS_WORD;
+    LAYER_SS_PPS = LAYER_SS_PPS_WORD;
+    sys_lock();
+    
+    // Configure IO
+    REG_CLR(LAYER_SS_ANSEL, LAYER_SS_PIN_MASK);
+    
+    REG_SET(LAYER_SDI_TRIS, LAYER_SDI_PIN_MASK);
+    REG_SET(LAYER_SCK_TRIS, LAYER_SCK_PIN_MASK);
+    REG_SET(LAYER_SS_TRIS, LAYER_SS_PIN_MASK);
+
+    // Initialize DMA
+    layer_dma_channel = dma_construct(layer_dma_config);
+    if(NULL == layer_dma_channel)
+        goto deinit_dma;
+    
+    // Initialize SPI
+    layer_spi_module = spi_construct(LAYER_SPI_CHANNEL, layer_spi_config);
+    if(NULL == layer_spi_module)
+        goto deinit_spi;
+    spi_configure_dma_src(layer_spi_module, layer_dma_channel); // SPI module is the source of the dma module
+    spi_enable(layer_spi_module);
+   
+    return KERN_INIT_SUCCCES;
+    
+deinit_spi:
+    spi_destruct(layer_spi_module);
+deinit_dma:
+    dma_destruct(layer_dma_channel);
+
+    return KERN_INIT_FAILED;
+}
+
 static void layer_rtask_execute(void)
 {
     switch(layer_state) {
         default:
         case LAYER_IDLE:
+            break;
+        case LAYER_RECEIVE_FRAME:
+        case LAYER_RECEIVE_FRAME_DMA_START:
+            // @Todo: add timeout timer
+            if(dma_ready(layer_dma_channel)) {
+                dma_configure_src(layer_dma_channel, layer_dma_ptr, LAYER_FRAME_BUFFER_SIZE);
+                dma_enable_transfer(layer_dma_channel);
+                layer_state = LAYER_RECEIVE_FRAME_DMA_WAIT;
+            }
+            break;
+        case LAYER_RECEIVE_FRAME_DMA_WAIT:
+            if(dma_ready(layer_dma_channel))
+                layer_state = LAYER_IDLE;
             break;
     }
 }

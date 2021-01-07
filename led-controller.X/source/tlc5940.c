@@ -18,7 +18,6 @@
 #define TLC5940_BUFFER_SIZE_DOT_CORR    (12 * TLC5940_NUM_OF_DEVICES)
 #define TLC5940_CHANNEL_SIZE            (TLC5940_CHANNELS_PER_DEVICE * TLC5940_NUM_OF_DEVICES)
 
-// @Todo: change to actual SPI channel and pins
 #define TLC5940_SPI_CHANNEL             SPI_CHANNEL2
 #define TLC5940_SDO_PPS                 RPG7R
 
@@ -69,17 +68,13 @@ static int tlc5940_rtask_init(void);
 static void tlc5940_rtask_execute(void);
 KERN_QUICK_RTASK(tlc5940, tlc5940_rtask_init, tlc5940_rtask_execute);
 
-static unsigned char tlc5940_front_buffer[TLC5940_BUFFER_SIZE]; // Must be made available before the DMA config
+static unsigned char tlc5940_front_buffer[TLC5940_BUFFER_SIZE];
 static unsigned char tlc5940_back_buffer[TLC5940_BUFFER_SIZE];
 static unsigned char tlc5940_dot_corr_buffer[TLC5940_BUFFER_SIZE_DOT_CORR];
-static unsigned char* tlc5940_frame_ptr = tlc5940_back_buffer;
+static unsigned char* tlc5940_dma_ptr = tlc5940_back_buffer;
 static unsigned char* tlc5940_draw_ptr = tlc5940_front_buffer;
 
-static const struct dma_config tlc5940_dma_config =
-{
-    .block_transfer_complete = NULL, // For now we just poll the DMA channel
-};
-
+static const struct dma_config tlc5940_dma_config; // No special config needed
 static const struct spi_config tlc5940_spi_config =
 {
     .spicon_flags = SPI_MSTEN | SPI_STXISEL_COMPLETE | SPI_DISSDI | SPI_MODE8 | SPI_CKP,
@@ -89,7 +84,7 @@ static const struct spi_config tlc5940_spi_config =
 static const struct pwm_config tlc5940_pwm_config =
 {
     .duty = 0.5,
-    .frequency = 5000000,
+    .frequency = 10000000,
     .period_callback = &tlc5940_pwm_period_callback,
     .period_callback_div = 4096 // Every 4096 PWM periods (one GSCLK period), call the callback
 };
@@ -114,9 +109,9 @@ bool tlc5940_update(void)
     if(tlc5940_busy())
         return false;
     
-    unsigned char *frame_ptr = tlc5940_frame_ptr;
-    tlc5940_frame_ptr = tlc5940_draw_ptr;
-    tlc5940_draw_ptr = frame_ptr;
+    unsigned char *dma_ptr = tlc5940_dma_ptr;
+    tlc5940_dma_ptr = tlc5940_draw_ptr;
+    tlc5940_draw_ptr = dma_ptr;
     tlc5940_state = TLC5940_UPDATE;
     return true;
 }
@@ -135,11 +130,10 @@ void tlc5940_write_grayscale(unsigned int device, unsigned int channel, unsigned
   
     unsigned char byte1;
     unsigned char byte2;
-    unsigned int offset = TLC5940_NUM_OF_DEVICES - device - 1;
-    unsigned int index = channel + offset * TLC5940_CHANNELS_PER_DEVICE;
+    unsigned int index = channel + device * TLC5940_CHANNELS_PER_DEVICE;
     
     index += index >> 1;
-    if(index & 1) {
+    if(channel & 1) {
         byte1 = (value >> 8) & 0x0f;
         byte2 = (value & 0xff);
     } else {
@@ -232,7 +226,7 @@ static void tlc5940_rtask_execute(void)
         case TLC5940_UPDATE:
         case TLC5940_UPDATE_DMA_START:
             if(dma_ready(tlc5940_dma_channel)) {
-                dma_configure_src(tlc5940_dma_channel, tlc5940_frame_ptr, TLC5940_BUFFER_SIZE);
+                dma_configure_src(tlc5940_dma_channel, tlc5940_dma_ptr, TLC5940_BUFFER_SIZE);
                 dma_enable_transfer(tlc5940_dma_channel);
                 tlc5940_state = TLC5940_UPDATE_DMA_WAIT;
             }
@@ -258,7 +252,7 @@ static void tlc5940_rtask_execute(void)
             tlc5940_state = TLC5940_UPDATE_CLEAR_BUFFER;
             break;
         case TLC5940_UPDATE_CLEAR_BUFFER:
-            memset(tlc5940_frame_ptr, 0x00, TLC5940_BUFFER_SIZE);
+            memset(tlc5940_dma_ptr, 0x00, TLC5940_BUFFER_SIZE);
             tlc5940_state = TLC5940_IDLE;
             break;
     }

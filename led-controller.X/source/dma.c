@@ -127,7 +127,7 @@ static struct dma_channel dma_channels[] =
 void dma_init(void)
 {
     // Disable interrupt on each channel
-    for(int i = 0; i < DMA_NUMBER_OF_CHANNELS; ++i)
+    for(unsigned int i = 0; i < DMA_NUMBER_OF_CHANNELS; ++i)
         atomic_reg_ptr_clr(dma_channels[i].dma_int->iec, dma_channels[i].dma_int->mask);
     
     // Configure DMA
@@ -139,7 +139,7 @@ struct dma_channel* dma_construct(struct dma_config config)
     struct dma_channel* channel = NULL;
     
     // Search for an unused channel
-    for(int i = 0; i < DMA_NUMBER_OF_CHANNELS; ++i) {
+    for(unsigned int i = 0; i < DMA_NUMBER_OF_CHANNELS; ++i) {
         if(!dma_channels[i].assigned) {
             channel = &dma_channels[i];
             break;

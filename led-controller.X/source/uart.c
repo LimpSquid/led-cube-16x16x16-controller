@@ -253,7 +253,7 @@ static void uart_rtask_execute(void)
             uart_state = uart_error.by_byte ? UART_RECEIVE_ERROR : UART_RECEIVE_BURST_READ;
             break;
         case UART_RECEIVE_BURST_READ:
-            for(int i = 0; uart_rx_ready() && i < UART_RX_BURST; ++i)
+            for(unsigned int i = 0; uart_rx_ready() && i < UART_RX_BURST; ++i)
                 uart_receive(UART_RX_REG);
             uart_state = UART_IDLE;
             break;
@@ -265,7 +265,7 @@ static void uart_rtask_execute(void)
         // Transfer routine
         case UART_TRANSFER:
         case UART_TRANSFER_BURST_WRITE:
-            for(int i = 0; uart_tx_ready() && i < UART_TX_BURST; ++i)
+            for(unsigned int i = 0; uart_tx_ready() && i < UART_TX_BURST; ++i)
                 uart_write(uart_tx_take());
             uart_state = UART_IDLE;
             break;

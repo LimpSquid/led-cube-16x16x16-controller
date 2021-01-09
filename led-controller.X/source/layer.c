@@ -16,8 +16,12 @@
 
 #define LAYER_NUM_OF_ROWS           16
 #define LAYER_NUM_OF_COLS           16
+#define LAYER_NUM_OF_LEDS           (LAYER_NUM_OF_ROWS * LAYER_NUM_OF_COLS)
+#define LAYER_RED_OFFSET            (LAYER_NUM_OF_LEDS * 0)
+#define LAYER_GREEN_OFFSET          (LAYER_NUM_OF_LEDS * 1)
+#define LAYER_BLUE_OFFSET           (LAYER_NUM_OF_LEDS * 2)
 #define LAYER_FRAME_DEPTH           3 // RGB
-#define LAYER_FRAME_BUFFER_SIZE     (LAYER_NUM_OF_COLS * LAYER_NUM_OF_ROWS * LAYER_FRAME_DEPTH)
+#define LAYER_FRAME_BUFFER_SIZE     (LAYER_NUM_OF_LEDS * LAYER_FRAME_DEPTH)
 #define LAYER_IO(pin, bank) \
     { \
         .ansel = NULL, \
@@ -111,6 +115,10 @@ static struct dma_channel* layer_dma_channel = NULL;
 static struct spi_module* layer_spi_module = NULL;
 static enum layer_state layer_state = LAYER_IDLE;
 static unsigned int layer_row_index = 0;
+static unsigned int layer_red_index = 0;
+static unsigned int layer_green_index = 0;
+static unsigned int layer_blue_index = 0;
+static unsigned int layer_offset = 0;
 
 bool layer_busy(void)
 {
@@ -150,7 +158,7 @@ static int layer_ttask_init(void)
     const struct layer_io* io = NULL;
     
     // Initialize IO
-    for(int i = 0; i < LAYER_NUM_OF_ROWS; ++i) {
+    for(unsigned int i = 0; i < LAYER_NUM_OF_ROWS; ++i) {
         io = &layer_io[i];
         if(NULL != io->ansel)
             atomic_reg_ptr_clr(io->ansel, io->mask);
@@ -165,18 +173,18 @@ static int layer_ttask_init(void)
 }
 
 static void layer_ttask_execute(void)
-{
+{    
     if(tlc5940_ready()) {
-        // @Commit: temporary stuff
-        int offset = LAYER_NUM_OF_COLS * layer_row_index;
+        layer_offset = layer_row_index * LAYER_NUM_OF_COLS;
         for(unsigned int i = 0; i < LAYER_NUM_OF_COLS; i++) {
-            //tlc5940_write_grayscale(0, i, 0xffff);
-            //tlc5940_write_grayscale(1, i, 0xffff);
-            tlc5940_write_grayscale(2, i, 0xffff);
             // Convert 8 bit to 12 bit equivalent
-//           tlc5940_write_grayscale(0, i, (layer_dma_ptr[i + offset] << 4) | (layer_dma_ptr[i + offset] >> 4));
-//           tlc5940_write_grayscale(1, i, (layer_dma_ptr[i + offset + 256] << 4) | (layer_dma_ptr[i + offset + 256] >> 4));
-//           tlc5940_write_grayscale(2, i, (layer_dma_ptr[i + offset + 512] << 4) | (layer_dma_ptr[i + offset + 512] >> 4));
+            layer_red_index = i + layer_offset + LAYER_RED_OFFSET;
+            layer_green_index = i + layer_offset + LAYER_GREEN_OFFSET;
+            layer_blue_index = i + layer_offset + LAYER_BLUE_OFFSET;
+            
+            tlc5940_write_grayscale(0, i, (layer_dma_ptr[layer_red_index] << 4) | (layer_dma_ptr[layer_red_index] >> 4));
+            tlc5940_write_grayscale(1, i, (layer_dma_ptr[layer_green_index] << 4) | (layer_dma_ptr[layer_green_index] >> 4));
+            tlc5940_write_grayscale(2, i, (layer_dma_ptr[layer_blue_index] << 4) | (layer_dma_ptr[layer_blue_index] >> 4));
         }
         tlc5940_update();
     }
@@ -235,7 +243,7 @@ static void layer_rtask_execute(void)
         case LAYER_RECEIVE_FRAME_DMA_START:
             // @Todo: add timeout timer
             if(dma_ready(layer_dma_channel)) {
-                dma_configure_src(layer_dma_channel, layer_dma_ptr, LAYER_FRAME_BUFFER_SIZE);
+                dma_configure_dst(layer_dma_channel, layer_dma_ptr, LAYER_FRAME_BUFFER_SIZE);
                 dma_enable_transfer(layer_dma_channel);
                 layer_state = LAYER_RECEIVE_FRAME_DMA_WAIT;
             }

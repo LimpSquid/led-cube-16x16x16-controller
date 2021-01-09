@@ -44,7 +44,7 @@ struct timer_module* timer_construct(int type, void (*execute)(struct timer_modu
         return timer;
     
     // Search for an unused timer
-    for(int i = 0; i < TIMER_POOL_SIZE; ++i) {
+    for(unsigned int i = 0; i < TIMER_POOL_SIZE; ++i) {
         if(!timer_pool[i].opt.assigned) {
             timer = &timer_pool[i];
             break;
@@ -142,7 +142,7 @@ static unsigned long timer_compute_ticks(int time, int unit)
 
 static int timer_ttask_init(void)
 {
-    for(int i = 0; i < TIMER_POOL_SIZE; ++i)
+    for(unsigned int i = 0; i < TIMER_POOL_SIZE; ++i)
         timer_pool[i].opt.assigned = false;
     
     return KERN_INIT_SUCCCES;
@@ -153,7 +153,7 @@ static void timer_ttask_execute(void)
     void (*execute)(struct timer_module*) = NULL;
 
     struct timer_module* timer = timer_pool;
-    for(int i = 0; i < TIMER_POOL_SIZE; ++i) {
+    for(unsigned int i = 0; i < TIMER_POOL_SIZE; ++i) {
         if(timer->opt.assigned && !timer->opt.suspended) {
             
             // Decrement tick count

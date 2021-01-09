@@ -78,7 +78,7 @@ static const struct dma_config tlc5940_dma_config; // No special config needed
 static const struct spi_config tlc5940_spi_config =
 {
     .spicon_flags = SPI_MSTEN | SPI_STXISEL_COMPLETE | SPI_DISSDI | SPI_MODE8 | SPI_CKP,
-    .baudrate = 10000000,
+    .baudrate = 20000000,
 };
 
 static const struct pwm_config tlc5940_pwm_config =
@@ -236,19 +236,27 @@ static void tlc5940_rtask_execute(void)
                 tlc5940_state = TLC5940_UPDATE_LATCH;
             break;
         case TLC5940_UPDATE_LATCH:
+            // Disable PWM
+            pwm_disable();
+            REG_SET(TLC5940_BLANK_LAT, TLC5940_BLANK_PIN_MASK);
+            
             // Latch in data
             REG_SET(TLC5940_XLAT_LAT, TLC5940_XLAT_PIN_MASK);
             REG_CLR(TLC5940_XLAT_LAT, TLC5940_XLAT_PIN_MASK);
-
+            
             // Shift diagnostic data
             spi_disable(tlc5940_spi_module);
             REG_INV(TLC5940_SCK_LAT, TLC5940_SCK_PIN_MASK);
             REG_INV(TLC5940_SCK_LAT, TLC5940_SCK_PIN_MASK);
             spi_enable(tlc5940_spi_module);
-
+            
             if(NULL != tlc5940_latch_callback)
                 tlc5940_latch_callback();
 
+            // Enable PWM
+            REG_CLR(TLC5940_BLANK_LAT, TLC5940_BLANK_PIN_MASK);
+            pwm_enable();
+            
             tlc5940_state = TLC5940_UPDATE_CLEAR_BUFFER;
             break;
         case TLC5940_UPDATE_CLEAR_BUFFER:

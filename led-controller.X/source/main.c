@@ -21,6 +21,11 @@ int main()
     // Wakeup bonzo
     sys_wakeup_bonzo();
     
+    // @Commit: remove this
+    ANSELBbits.ANSB7 = 0;
+    TRISBbits.TRISB7 = 0;
+    LATBbits.LATB7 = 0;    
+    
     // Bonzo is always hungry... 
     while(SYS_BONZO_IS_HUNGRY) {
         sys_feed_bonzo();

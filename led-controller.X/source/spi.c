@@ -151,7 +151,6 @@ void spi_configure_dma_src(struct spi_module* module, struct dma_channel* channe
 {
     ASSERT(NULL != module);
     ASSERT(NULL != channel);
-    unsigned int spicon = atomic_reg_value(module->spi_reg->spicon);
     struct dma_event start_event =
     {
         .enable = true,
@@ -164,7 +163,7 @@ void spi_configure_dma_src(struct spi_module* module, struct dma_channel* channe
         .irq_vector = module->spi_int->fault_irq,
     };
     
-    dma_configure_src(channel, &module->spi_reg, 1); // one fifo_size per transfer
+    dma_configure_src(channel, &module->spi_reg->spibuf, 1); // one fifo_size per transfer
     dma_configure_cell(channel, module->fifo_size);
     dma_configure_start_event(channel, start_event);
     dma_configure_abort_event(channel, abort_event);
@@ -174,7 +173,6 @@ void spi_configure_dma_dst(struct spi_module* module, struct dma_channel* channe
 {
     ASSERT(NULL != module);
     ASSERT(NULL != channel);
-    unsigned int spicon = atomic_reg_value(module->spi_reg->spicon);
     struct dma_event start_event =
     {
         .enable = true,
@@ -207,7 +205,7 @@ void spi_disable(struct spi_module* module)
     atomic_reg_clr(module->spi_reg->spicon, SPI_ON);
 }
 
-bool spi_transmit(struct spi_module* module, unsigned int* buffer, unsigned int size)
+bool spi_transmit_mode32(struct spi_module* module, unsigned int* buffer, unsigned int size)
 {
     ASSERT(NULL != module);
     ASSERT(atomic_reg_value(module->spi_reg->spicon) & SPI_ON);
@@ -229,10 +227,9 @@ bool spi_transmit_mode8(struct spi_module* module, unsigned char* buffer, unsign
     ASSERT(NULL != module);
     ASSERT(atomic_reg_value(module->spi_reg->spicon) & SPI_ON);
     const struct spi_register_map* const spi_reg = module->spi_reg;
-    unsigned int spicon = atomic_reg_value(spi_reg->spicon);
     bool result = false;
     
-    if(size && (spicon & SPI_MSTEN) && (spicon & SPI_MODE8)) {
+    if(size && atomic_reg_value(spi_reg->spicon) & SPI_MSTEN) {
         while(size--) {
             while(atomic_reg_value(spi_reg->spistat) & SPI_SPISTAT_SPITBF_MASK);
             atomic_reg_value(spi_reg->spibuf) = *buffer++;
